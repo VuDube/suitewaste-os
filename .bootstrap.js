@@ -77,7 +77,11 @@ function updateWranglerJsonc() {
 }
 
 function runSetupCommands() {
-    const commands = [];
+    const commands = [
+    "bun add idb-keyval@^6.2.2",
+    "bun add localforage@^1.10.0",
+    "bun add workbox-window@^7.1.0"
+];
     
     if (commands.length === 0) {
         console.log('⊘ No setup commands to run');
