@@ -77,26 +77,7 @@ function updateWranglerJsonc() {
 }
 
 function runSetupCommands() {
-    const commands = [
-    "bun add idb-keyval@^6.2.2",
-    "bun add localforage@^1.10.0",
-    "bun add workbox-window@^7.1.0",
-    "bun add workbox-window",
-    "bun add bcryptjs jsonwebtoken",
-    "bun add idb-keyval@^6.2.1",
-    "bun add tslib@^2.6.3",
-    "bun add @types/jsonwebtoken -d",
-    "bun add buffer@^6.1.1 jsonwebtoken@^9.2.1",
-    "bun add buffer",
-    "bun add framer-motion lucide-react clsx tailwind-merge",
-    "bun add uuid",
-    "bun install @types/w3c-web-usb @types/w3c-web-serial",
-    "bun remove uuid",
-    "bun add lucide-react@latest",
-    "bun add qrcode.react leaflet @types/leaflet",
-    "bun add @types/leaflet -d",
-    "bun add @types/w3c-web-usb @types/w3c-web-serial"
-];
+    const commands = [];
     
     if (commands.length === 0) {
         console.log('⊘ No setup commands to run');
