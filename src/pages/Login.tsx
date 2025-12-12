@@ -31,7 +31,11 @@ export function Login() {
       loginAction(data.user, data.token);
       toast.success(`Welcome back, ${data.user.username}!`);
       // Role-based redirect can be added here
-      navigate('/quick-weight');
+      if (data.user.role === 'operator') {
+        navigate('/quick-weight');
+      } else {
+        navigate('/dashboard');
+      }
     },
     onError: (error) => {
       toast.error('Login Failed', { description: error.message });
