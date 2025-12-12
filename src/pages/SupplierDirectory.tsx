@@ -5,24 +5,28 @@ import type { Supplier } from "@shared/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Toaster, toast } from "sonner";
-import { PlusCircle, Trash2, Search, Loader2 } from "lucide-react";
+import { PlusCircle, Trash2, Search, Loader2, ShieldAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { PageLayout } from "@/components/PageLayout";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { useAuth } from "@/hooks/useAuth";
 type SupplierFormData = Omit<Supplier, 'id' | 'created_at' | 'updated_at'>;
 const PAGE_SIZE = 10;
 export function SupplierDirectory() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const canManage = user?.role === 'admin' || user?.role === 'manager';
   const { data: suppliers, isLoading } = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => api<Supplier[]>('/api/suppliers'),
+    enabled: !!user,
   });
   const createMutation = useMutation({
     mutationFn: (newSupplier: SupplierFormData) => api<Supplier>('/api/suppliers', {
@@ -64,11 +68,39 @@ export function SupplierDirectory() {
   ) || [];
   const totalPages = Math.ceil(filteredSuppliers.length / PAGE_SIZE);
   const paginatedSuppliers = filteredSuppliers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  if (!canManage) {
+    return (
+      <PageLayout>
+        <div className="flex flex-col items-center justify-center h-96 text-center">
+          <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
+          <h2 className="text-2xl font-bold">Access Denied</h2>
+          <p className="text-muted-foreground">You do not have permission to view or manage suppliers.</p>
+        </div>
+      </PageLayout>
+    );
+  }
   return (
     <PageLayout>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Supplier Directory</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}><DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add Supplier</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Create New Supplier</DialogTitle></DialogHeader><form onSubmit={handleSubmit(onSubmit)} className="space-y-4"><Input placeholder="Supplier Name" {...register("name", { required: true })} /><Input placeholder="Contact Person" {...register("contact_person")} /><Input placeholder="Phone Number" {...register("phone_number")} /><Input placeholder="Email" type="email" {...register("email")} /><Input placeholder="EPR Number" {...register("epr_number")} /><div className="flex items-center space-x-2"><Checkbox id="weee_compliant" {...register("is_weee_compliant")} /><Label htmlFor="weee_compliant">WEEE Compliant</Label></div><Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create Supplier</Button></form></DialogContent></Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add Supplier</Button></DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Supplier</DialogTitle>
+              <DialogDescription>Enter supplier details for EPR compliance and transaction records.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <Input placeholder="Supplier Name" {...register("name", { required: true })} />
+              <Input placeholder="Contact Person" {...register("contact_person")} />
+              <Input placeholder="Phone Number" {...register("phone_number")} />
+              <Input placeholder="Email" type="email" {...register("email")} />
+              <Input placeholder="EPR Number" {...register("epr_number")} />
+              <div className="flex items-center space-x-2"><Checkbox id="weee_compliant" {...register("is_weee_compliant")} /><Label htmlFor="weee_compliant">WEEE Compliant</Label></div>
+              <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create Supplier</Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />

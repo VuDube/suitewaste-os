@@ -17,13 +17,14 @@ import { SupplierDirectory } from '@/pages/SupplierDirectory';
 import { InventoryLedger } from '@/pages/InventoryLedger';
 import { Transactions } from '@/pages/Transactions';
 import { HardwareIntegrations } from '@/pages/HardwareIntegrations';
+import { Login } from '@/pages/Login';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
       gcTime: 10 * 60 * 1000, // 10 minutes
       retry: (failureCount, error) => {
-        if ((error as any)?.status === 404) return false;
+        if ((error as any)?.status === 404 || (error as any)?.status === 401) return false;
         return failureCount < 2;
       },
       refetchOnWindowFocus: import.meta.env.PROD,
@@ -31,6 +32,7 @@ const queryClient = new QueryClient({
   },
 });
 const router = createBrowserRouter([
+  { path: "/login", element: <Login />, errorElement: <RouteErrorBoundary /> },
   { path: "/", element: <HomePage />, errorElement: <RouteErrorBoundary /> },
   { path: "/quick-weight", element: <QuickWeightPOS />, errorElement: <RouteErrorBoundary /> },
   { path: "/suppliers", element: <SupplierDirectory />, errorElement: <RouteErrorBoundary /> },

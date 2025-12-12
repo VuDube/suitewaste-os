@@ -1,9 +1,50 @@
 import { Hono } from "hono";
 import type { Env } from './core-utils';
-import { SupplierEntity, InventoryLedgerEntity, TransactionEntity } from "./entities";
-import { ok, bad } from './core-utils';
-import type { InventoryLedgerEntry, Supplier, Transaction } from "@shared/types";
+import { SupplierEntity, InventoryLedgerEntity, TransactionEntity, UserEntity } from "./entities";
+import { ok, bad, notFound } from './core-utils';
+import type { InventoryLedgerEntry, Supplier, Transaction, User } from "@shared/types";
+import { HTTPException } from "hono/http-exception";
+const unauthorized = () => new HTTPException(401, { message: 'Unauthorized' });
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
+  // --- AUTH MIDDLEWARE ---
+  app.use('/api/*', async (c, next) => {
+    if (c.req.path.startsWith('/api/auth/')) {
+      return next();
+    }
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw unauthorized();
+    }
+    const token = authHeader.split(' ')[1];
+    const user = await new UserEntity(c.env, token).getState();
+    if (!user || !user.id || !user.active) {
+      throw unauthorized();
+    }
+    c.set('user', user);
+    await next();
+  });
+  // --- AUTH ROUTES ---
+  app.post('/api/auth/login', async (c) => {
+    await UserEntity.ensureSeed(c.env);
+    const { username, password } = await c.req.json<{ username?: string; password?: string }>();
+    if (!username || !password) return bad(c, 'Username and password are required');
+    const allUsers = (await UserEntity.list(c.env, null, 100)).items;
+    const user = allUsers.find(u => u.username === username && u.password_hash === password);
+    if (!user || !user.active) {
+      return notFound(c, 'Invalid credentials or inactive user');
+    }
+    const { password_hash, ...userWithoutPassword } = user;
+    return ok(c, { user: userWithoutPassword, token: user.id });
+  });
+  app.get('/api/auth/me', async (c) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) throw unauthorized();
+    const token = authHeader.split(' ')[1];
+    const user = await new UserEntity(c.env, token).getState();
+    if (!user || !user.id || !user.active) throw unauthorized();
+    const { password_hash, ...userWithoutPassword } = user;
+    return ok(c, userWithoutPassword);
+  });
   // --- SUPPLIERS ---
   app.get('/api/suppliers', async (c) => {
     await SupplierEntity.ensureSeed(c.env);
@@ -35,7 +76,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   // --- INVENTORY LEDGER ---
   app.get('/api/ledger', async (c) => {
     await InventoryLedgerEntity.ensureSeed(c.env);
-    const page = await InventoryLedgerEntity.list(c.env, null, 200); // Fetch more for client-side filtering
+    const page = await InventoryLedgerEntity.list(c.env, null, 200);
     return ok(c, page.items);
   });
   app.post('/api/ledger', async (c) => {
@@ -116,8 +157,6 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   });
   // --- HARDWARE MOCKS ---
   app.get('/api/camera/snapshot', async (c) => {
-    // In a real app, you'd fetch from an IP camera using credentials from KV/Secrets
-    // For this demo, we return a random industrial-themed image from Unsplash.
     const randomId = Math.floor(Math.random() * 1000);
     const imageUrl = `https://images.unsplash.com/photo-1581092919546-23c1c35a828d?q=80&w=800&auto=format&fit=crop&ixid=${randomId}`;
     return ok(c, { imageUrl });

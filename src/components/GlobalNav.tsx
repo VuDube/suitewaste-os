@@ -1,25 +1,24 @@
 import { useState, useEffect } from 'react';
-import { NavLink, Link } from 'react-router-dom';
-import { HardHat, Menu, X, LayoutDashboard, Weight, Users, BookOpen, Settings2, Download } from 'lucide-react';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { HardHat, Menu, X, LayoutDashboard, Weight, Users, BookOpen, Settings2, Download, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/useAuthStore';
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: Array<string>;
-  readonly userChoice: Promise<{
-    outcome: 'accepted' | 'dismissed',
-    platform: string,
-  }>;
+  readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed', platform: string }>;
   prompt(): Promise<void>;
 }
 const navItems = [
-  { href: '/', label: 'Home', icon: LayoutDashboard },
-  { href: '/quick-weight', label: 'Quick-Weight', icon: Weight },
-  { href: '/suppliers', label: 'Suppliers', icon: Users },
-  { href: '/ledger', label: 'Ledger', icon: BookOpen },
-  { href: '/transactions', label: 'Transactions', icon: BookOpen },
-  { href: '/hardware', label: 'Hardware', icon: Settings2 },
+  { href: '/', label: 'Home', icon: LayoutDashboard, roles: ['operator', 'manager', 'admin', 'auditor'] },
+  { href: '/quick-weight', label: 'Quick-Weight', icon: Weight, roles: ['operator', 'manager', 'admin'] },
+  { href: '/suppliers', label: 'Suppliers', icon: Users, roles: ['manager', 'admin'] },
+  { href: '/ledger', label: 'Ledger', icon: BookOpen, roles: ['manager', 'admin', 'auditor'] },
+  { href: '/transactions', label: 'Transactions', icon: BookOpen, roles: ['manager', 'admin', 'auditor'] },
+  { href: '/hardware', label: 'Hardware', icon: Settings2, roles: ['admin'] },
 ];
 function usePWAInstall() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -29,9 +28,7 @@ function usePWAInstall() {
       setInstallPrompt(e as BeforeInstallPromptEvent);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
   const handleInstall = async () => {
     if (!installPrompt) return;
@@ -46,8 +43,16 @@ function usePWAInstall() {
 export function GlobalNav() {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { installPrompt, handleInstall } = usePWAInstall();
+  const { user } = useAuth();
+  const logout = useAuthStore(s => s.logout);
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+  const accessibleNavItems = navItems.filter(item => user && item.roles.includes(user.role));
   const NavLinks = ({ className }: { className?: string }) => (
-    navItems.map((item) => (
+    accessibleNavItems.map((item) => (
       <NavLink
         key={item.href}
         to={item.href}
@@ -55,9 +60,7 @@ export function GlobalNav() {
         className={({ isActive }) =>
           cn(
             "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-            isActive
-              ? "bg-primary/10 text-primary"
-              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
             className
           )
         }
@@ -87,6 +90,7 @@ export function GlobalNav() {
               </Button>
             )}
             <ThemeToggle className="relative top-0 right-0" />
+            <Button onClick={handleLogout} variant="ghost" size="icon" className="hidden md:inline-flex"><LogOut className="h-5 w-5" /></Button>
             <div className="md:hidden">
               <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild><Button variant="ghost" size="icon"><Menu className="h-6 w-6" /><span className="sr-only">Open menu</span></Button></SheetTrigger>
@@ -97,6 +101,7 @@ export function GlobalNav() {
                   </div>
                   <nav className="flex flex-col gap-2">
                     <NavLinks className="text-base" />
+                    <Button onClick={handleLogout} variant="outline" className="mt-4"><LogOut className="mr-2 h-4 w-4" /> Logout</Button>
                     {installPrompt && (
                       <Button onClick={handleInstall} variant="outline" className="mt-4">
                         <Download className="mr-2 h-4 w-4" /> Install App

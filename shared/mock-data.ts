@@ -1,5 +1,39 @@
-import type { Supplier, InventoryLedgerEntry, Transaction } from './types';
+import type { Supplier, InventoryLedgerEntry, Transaction, User } from './types';
 import { v4 as uuid } from 'uuid';
+export const MOCK_USERS: User[] = [
+  {
+    id: 'user-op-001',
+    username: 'operator1',
+    password_hash: 'pin123',
+    role: 'operator',
+    active: true,
+    created_at: Date.now(),
+  },
+  {
+    id: 'user-mgr-001',
+    username: 'manager1',
+    password_hash: 'pass456',
+    role: 'manager',
+    active: true,
+    created_at: Date.now(),
+  },
+  {
+    id: 'user-adm-001',
+    username: 'admin1',
+    password_hash: 'admin789',
+    role: 'admin',
+    active: true,
+    created_at: Date.now(),
+  },
+  {
+    id: 'user-aud-001',
+    username: 'auditor1',
+    password_hash: 'audit123',
+    role: 'auditor',
+    active: true,
+    created_at: Date.now(),
+  },
+];
 export const MOCK_SUPPLIERS: Supplier[] = [
   {
     id: uuid(),

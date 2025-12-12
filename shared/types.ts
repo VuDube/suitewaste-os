@@ -4,6 +4,15 @@ export interface ApiResponse<T = unknown> {
   error?: string;
 }
 // --- SuiteWaste OS Core Types ---
+export interface User {
+  id: string;
+  username: string;
+  email?: string;
+  password_hash: string;
+  role: 'operator' | 'manager' | 'admin' | 'auditor';
+  active: boolean;
+  created_at: number; // epoch millis
+}
 export interface Supplier {
   id: string;
   name: string;

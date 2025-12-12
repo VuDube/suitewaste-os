@@ -8,25 +8,29 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSerialScale } from "@/hooks/useSerialScale";
 import { useOfflineStore } from "@/stores/useOfflineStore";
 import { cn } from "@/lib/utils";
-import { Cable, CheckCircle, CircleDashed, Send, XCircle } from "lucide-react";
+import { Cable, CheckCircle, CircleDashed, Loader2, Send, XCircle } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import type { Supplier } from "@shared/types";
 import { v4 as uuid } from 'uuid';
+import { useAuth } from "@/hooks/useAuth";
+import { Navigate } from "react-router-dom";
 export function QuickWeightPOS() {
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { weight, status, connect } = useSerialScale();
   const addLedgerEntry = useOfflineStore(s => s.addLedgerEntry);
   const addTransaction = useOfflineStore(s => s.addTransaction);
   const syncAllPending = useOfflineStore(s => s.syncAllPending);
   const totalPending = useOfflineStore(s => s.totalPending());
-  const [supplierId, setSupplierId] = useState<string | undefined>();
+  const [supplierId, setSupplierId] = useState<string>('');
   const [materialType, setMaterialType] = useState("");
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const { data: suppliers, isLoading: isLoadingSuppliers } = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => api<Supplier[]>('/api/suppliers'),
+    enabled: !!user,
   });
   const handleCapture = () => {
     if (status !== 'connected' && status !== 'parsing') {
@@ -58,6 +62,7 @@ export function QuickWeightPOS() {
       material_type: materialType.trim(),
       weight_kg: weight,
       notes: notes.trim(),
+      operator_id: user?.id,
     });
     addTransaction({
       ledger_entry_id: ledgerEntryId,
@@ -77,8 +82,14 @@ export function QuickWeightPOS() {
     parsing: <CheckCircle className="h-5 w-5 text-green-500 animate-pulse" />,
     error: <XCircle className="h-5 w-5 text-red-500" />,
   };
+  if (isAuthLoading) {
+    return <div className="h-screen w-full flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
+    <div className="min-h-dvh bg-background text-foreground flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
       <div className="w-full max-w-5xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
           <div className="md:col-span-2">
@@ -135,7 +146,7 @@ export function QuickWeightPOS() {
                 <div>
                   <label htmlFor="supplier" className="text-sm font-medium text-muted-foreground mb-1 block">Supplier</label>
                   {isLoadingSuppliers ? <Skeleton className="h-10 w-full" /> : (
-                    <Select onValueChange={setSupplierId} value={supplierId}>
+                    <Select onValueChange={setSupplierId} value={supplierId || ''}>
                       <SelectTrigger className="bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring">
                         <SelectValue placeholder="Select a supplier" />
                       </SelectTrigger>

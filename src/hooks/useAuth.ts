@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { api } from '@/lib/api-client';
@@ -7,28 +7,22 @@ import type { User } from '@shared/types';
 export function useAuth() {
   const navigate = useNavigate();
   const location = useLocation();
-  const queryClient = useQueryClient();
-  // Zustand Zero-Tolerance: Primitive selectors only
   const token = useAuthStore(s => s.token);
-  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const user = useAuthStore(s => s.user);
   const setUser = useAuthStore(s => s.setUser);
   const logout = useAuthStore(s => s.logout);
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['me', token],
+    queryKey: ['me'],
     queryFn: async () => {
-      const activeToken = token || localStorage.getItem('token');
-      if (!activeToken) throw new Error('No token');
+      const localToken = localStorage.getItem('token');
+      if (!localToken) throw new Error('No token found');
       return api<User>('/api/auth/me', {
-        headers: { Authorization: `Bearer ${activeToken}` },
+        headers: { Authorization: `Bearer ${localToken}` },
       });
     },
-    enabled: !!(token || localStorage.getItem('token')),
-    retry: (failureCount, err: any) => {
-      if (err?.status === 401) return false;
-      return failureCount < 2;
-    },
-    staleTime: 5 * 60 * 1000,
+    enabled: !isAuthenticated && !!localStorage.getItem('token'),
+    retry: false,
   });
   useEffect(() => {
     if (data) {
@@ -37,18 +31,11 @@ export function useAuth() {
   }, [data, setUser]);
   useEffect(() => {
     if (isError) {
-      const errStatus = (error as any)?.status;
-      if (errStatus === 401 || !localStorage.getItem('token')) {
-        logout();
-        queryClient.clear();
-        if (location.pathname !== '/login') {
-          navigate('/login', {
-            replace: true,
-            state: { from: location.pathname, reason: 'session_expired' }
-          });
-        }
+      logout();
+      if (location.pathname !== '/login') {
+        navigate('/login');
       }
     }
-  }, [isError, error, logout, navigate, location.pathname, queryClient]);
-  return { user, token, isAuthenticated, isLoading };
+  }, [isError, logout, navigate, location.pathname]);
+  return { user, token, isAuthenticated, isLoading, error };
 }
