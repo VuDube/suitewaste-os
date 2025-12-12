@@ -11,7 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css'
-import { HomePage } from '@/pages/HomePage'
+import { Dashboard } from '@/pages/Dashboard';
 import { QuickWeightPOS } from '@/pages/QuickWeightPOS';
 import { SupplierDirectory } from '@/pages/SupplierDirectory';
 import { InventoryLedger } from '@/pages/InventoryLedger';
@@ -32,8 +32,8 @@ const queryClient = new QueryClient({
   },
 });
 const router = createBrowserRouter([
+  { path: "/", element: <Dashboard />, errorElement: <RouteErrorBoundary /> },
   { path: "/login", element: <Login />, errorElement: <RouteErrorBoundary /> },
-  { path: "/", element: <HomePage />, errorElement: <RouteErrorBoundary /> },
   { path: "/quick-weight", element: <QuickWeightPOS />, errorElement: <RouteErrorBoundary /> },
   { path: "/suppliers", element: <SupplierDirectory />, errorElement: <RouteErrorBoundary /> },
   { path: "/ledger", element: <InventoryLedger />, errorElement: <RouteErrorBoundary /> },

@@ -13,8 +13,8 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 const navItems = [
-  { href: '/', label: 'Home', icon: LayoutDashboard, roles: ['operator', 'manager', 'admin', 'auditor'] },
-  { href: '/quick-weight', label: 'Quick-Weight', icon: Weight, roles: ['operator', 'manager', 'admin'] },
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'manager', 'admin', 'auditor'] },
+  { href: '/quick-weight', label: 'Weigh', icon: Weight, roles: ['operator', 'manager', 'admin'] },
   { href: '/suppliers', label: 'Suppliers', icon: Users, roles: ['manager', 'admin'] },
   { href: '/ledger', label: 'Ledger', icon: BookOpen, roles: ['manager', 'admin', 'auditor'] },
   { href: '/transactions', label: 'Transactions', icon: BookOpen, roles: ['manager', 'admin', 'auditor'] },
@@ -51,69 +51,96 @@ export function GlobalNav() {
     navigate('/login');
   };
   const accessibleNavItems = navItems.filter(item => user && item.roles.includes(user.role));
-  const NavLinks = ({ className }: { className?: string }) => (
-    accessibleNavItems.map((item) => (
-      <NavLink
-        key={item.href}
-        to={item.href}
-        onClick={() => setMobileMenuOpen(false)}
-        className={({ isActive }) =>
-          cn(
-            "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-            isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-            className
-          )
-        }
-      >
-        <item.icon className="h-4 w-4" />
-        {item.label}
-      </NavLink>
-    ))
+  const DesktopNavLinks = () => (
+    <nav className="hidden md:flex items-center gap-1">
+      {accessibleNavItems.map((item) => (
+        <NavLink
+          key={item.href}
+          to={item.href}
+          className={({ isActive }) =>
+            cn(
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            )
+          }
+        >
+          <item.icon className="h-4 w-4" />
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+  const MobileNavLinks = () => (
+    <nav className="grid grid-cols-4 gap-1">
+      {accessibleNavItems.map((item) => (
+        <NavLink
+          key={item.href}
+          to={item.href}
+          onClick={() => setMobileMenuOpen(false)}
+          className={({ isActive }) =>
+            cn(
+              "flex flex-col items-center justify-center gap-1 rounded-lg p-2 h-16 text-xs font-medium transition-colors",
+              isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            )
+          }
+        >
+          <item.icon className="h-5 w-5" />
+          <span>{item.label}</span>
+        </NavLink>
+      ))}
+    </nav>
   );
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link to="/" className="flex items-center gap-2">
-              <HardHat className="h-7 w-7 text-primary" />
-              <span className="text-lg font-bold tracking-tighter">SuiteWaste OS</span>
-            </Link>
-            <nav className="hidden md:flex items-center gap-2">
-              <NavLinks />
-            </nav>
-          </div>
-          <div className="flex items-center gap-2">
-            {installPrompt && (
-              <Button onClick={handleInstall} variant="outline" size="sm" className="hidden sm:flex">
-                <Download className="mr-2 h-4 w-4" /> Install App
-              </Button>
-            )}
-            <ThemeToggle className="relative top-0 right-0" />
-            <Button onClick={handleLogout} variant="ghost" size="icon" className="hidden md:inline-flex"><LogOut className="h-5 w-5" /></Button>
-            <div className="md:hidden">
-              <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                <SheetTrigger asChild><Button variant="ghost" size="icon"><Menu className="h-6 w-6" /><span className="sr-only">Open menu</span></Button></SheetTrigger>
-                <SheetContent side="right" className="w-full max-w-xs">
-                  <div className="flex justify-between items-center mb-6">
-                    <Link to="/" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}><HardHat className="h-7 w-7 text-primary" /><span className="text-lg font-bold tracking-tighter">SuiteWaste OS</span></Link>
-                    <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}><X className="h-6 w-6" /><span className="sr-only">Close menu</span></Button>
-                  </div>
-                  <nav className="flex flex-col gap-2">
-                    <NavLinks className="text-base" />
-                    <Button onClick={handleLogout} variant="outline" className="mt-4"><LogOut className="mr-2 h-4 w-4" /> Logout</Button>
-                    {installPrompt && (
-                      <Button onClick={handleInstall} variant="outline" className="mt-4">
-                        <Download className="mr-2 h-4 w-4" /> Install App
-                      </Button>
-                    )}
-                  </nav>
-                </SheetContent>
-              </Sheet>
+    <>
+      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:block hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center gap-6">
+              <Link to="/" className="flex items-center gap-2">
+                <HardHat className="h-7 w-7 text-primary" />
+                <span className="text-lg font-bold tracking-tighter">SuiteWaste OS</span>
+              </Link>
+              <DesktopNavLinks />
+            </div>
+            <div className="flex items-center gap-2">
+              {installPrompt && (
+                <Button onClick={handleInstall} variant="outline" size="sm"><Download className="mr-2 h-4 w-4" /> Install</Button>
+              )}
+              <ThemeToggle className="relative top-0 right-0" />
+              <Button onClick={handleLogout} variant="ghost" size="icon"><LogOut className="h-5 w-5" /></Button>
             </div>
           </div>
         </div>
+      </header>
+      {/* Mobile Bottom Nav */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-background/95 backdrop-blur-sm border-t z-50">
+         <div className="grid h-full max-w-lg grid-cols-5 mx-auto">
+            {accessibleNavItems.slice(0, 4).map(item => (
+                 <NavLink key={item.href} to={item.href} className={({isActive}) => cn("inline-flex flex-col items-center justify-center px-5 hover:bg-accent group", isActive ? "text-primary" : "text-muted-foreground")}>
+                    <item.icon className="w-5 h-5 mb-1" />
+                    <span className="text-xs">{item.label}</span>
+                </NavLink>
+            ))}
+             <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                    <button type="button" className="inline-flex flex-col items-center justify-center px-5 hover:bg-accent group text-muted-foreground">
+                        <Menu className="w-5 h-5 mb-1" />
+                        <span className="text-xs">More</span>
+                    </button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="h-auto rounded-t-lg">
+                    <div className="p-4">
+                        <MobileNavLinks />
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                            {installPrompt && <Button onClick={handleInstall} variant="outline"><Download className="mr-2 h-4 w-4" /> Install App</Button>}
+                            <Button onClick={handleLogout} variant="outline"><LogOut className="mr-2 h-4 w-4" /> Logout</Button>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
+         </div>
       </div>
-    </header>
+      <div className="md:hidden pb-16"></div> {/* Spacer for bottom nav */}
+    </>
   );
 }

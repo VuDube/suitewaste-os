@@ -1,11 +1,13 @@
 import { Hono } from "hono";
+import type { Context } from 'hono';
 import type { Env } from './core-utils';
 import { SupplierEntity, InventoryLedgerEntity, TransactionEntity, UserEntity } from "./entities";
 import { ok, bad, notFound } from './core-utils';
 import type { InventoryLedgerEntry, Supplier, Transaction, User } from "@shared/types";
 import { HTTPException } from "hono/http-exception";
 const unauthorized = () => new HTTPException(401, { message: 'Unauthorized' });
-export function userRoutes(app: Hono<{ Bindings: Env }>) {
+type HonoApp = Hono<{ Bindings: Env; Variables: { user: User } }>;
+export function userRoutes(app: HonoApp) {
   // --- AUTH MIDDLEWARE ---
   app.use('/api/*', async (c, next) => {
     if (c.req.path.startsWith('/api/auth/')) {
@@ -20,12 +22,23 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     if (!user || !user.id || !user.active) {
       throw unauthorized();
     }
-    // c.set('user', user); // This line is removed as it's unused and causes a TS error.
+    c.set('user', user);
     await next();
   });
   // --- AUTH ROUTES ---
+  app.get('/api/auth/init', async (c) => {
+    const allUsers = (await UserEntity.list(c.env, null, 1)).items;
+    if (allUsers.length === 0) {
+      await UserEntity.ensureSeed(c.env);
+      return ok(c, { seeded: true, message: "Initial users seeded." });
+    }
+    return ok(c, { seeded: false, message: "Users already exist." });
+  });
   app.post('/api/auth/login', async (c) => {
-    await UserEntity.ensureSeed(c.env);
+    const allUsersCheck = (await UserEntity.list(c.env, null, 1)).items;
+    if (allUsersCheck.length === 0) {
+      await UserEntity.ensureSeed(c.env);
+    }
     const { username, password } = await c.req.json<{ username?: string; password?: string }>();
     if (!username || !password) return bad(c, 'Username and password are required');
     const allUsers = (await UserEntity.list(c.env, null, 100)).items;
@@ -37,13 +50,38 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     return ok(c, { user: userWithoutPassword, token: user.id });
   });
   app.get('/api/auth/me', async (c) => {
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) throw unauthorized();
-    const token = authHeader.split(' ')[1];
-    const user = await new UserEntity(c.env, token).getState();
-    if (!user || !user.id || !user.active) throw unauthorized();
+    const user = c.get('user');
     const { password_hash, ...userWithoutPassword } = user;
     return ok(c, userWithoutPassword);
+  });
+  // --- DASHBOARD ---
+  app.get('/api/dashboard', async (c) => {
+    const user = c.get('user');
+    const role = user.role;
+    const [suppliersPage, ledgerPage, transactionsPage] = await Promise.all([
+      SupplierEntity.list(c.env, null, 500),
+      InventoryLedgerEntity.list(c.env, null, 500),
+      TransactionEntity.list(c.env, null, 500),
+    ]);
+    const recentSuppliers = suppliersPage.items.sort((a, b) => b.created_at - a.created_at).slice(0, 5);
+    const recentLedger = ledgerPage.items.sort((a, b) => b.capture_timestamp - a.capture_timestamp).slice(0, 5);
+    const recentTransactions = transactionsPage.items.sort((a, b) => b.transaction_timestamp - a.transaction_timestamp).slice(0, 5);
+    const totalWeight = ledgerPage.items.reduce((sum, item) => sum + item.weight_kg, 0);
+    const totalValue = transactionsPage.items.reduce((sum, item) => sum + item.amount, 0);
+    const totalEPR = transactionsPage.items.reduce((sum, item) => sum + item.epr_fee, 0);
+    const weeeCompliantCount = suppliersPage.items.filter(s => s.is_weee_compliant).length;
+    const weeePct = suppliersPage.items.length > 0 ? (weeeCompliantCount / suppliersPage.items.length) * 100 : 0;
+    const data = {
+      operator: { recentTransactions, recentLedger },
+      manager: { totalWeight, totalValue, totalEPR, recentSuppliers, recentLedger },
+      admin: { totalWeight, totalValue, totalEPR, weeePct, recentSuppliers, userCount: (await UserEntity.list(c.env, null, 100)).items.length },
+      auditor: { totalWeight, totalEPR, weeePct, recentLedger, recentTransactions },
+    };
+    return ok(c, {
+      summary: data[role] || data.operator,
+      hardwareStatus: { scale: 'connected', camera: 'healthy' }, // Mock status
+      pendingSyncCount: Math.floor(Math.random() * 5), // Mock count
+    });
   });
   // --- SUPPLIERS ---
   app.get('/api/suppliers', async (c) => {
