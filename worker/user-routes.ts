@@ -6,11 +6,12 @@ import { ok, bad, notFound } from './core-utils';
 import type { InventoryLedgerEntry, Supplier, Transaction, User } from "@shared/types";
 import { HTTPException } from "hono/http-exception";
 const unauthorized = () => new HTTPException(401, { message: 'Unauthorized' });
-type HonoApp = Hono<{ Bindings: Env; Variables: { user: User } }>;
+type HonoApp = Hono<{ Bindings: Env; }>;
 export function userRoutes(app: HonoApp) {
   // --- AUTH MIDDLEWARE ---
   app.use('/api/*', async (c, next) => {
-    if (c.req.path.startsWith('/api/auth/')) {
+    const path = c.req.path;
+    if (path === '/api/auth/init' || path === '/api/auth/login') {
       return next();
     }
     const authHeader = c.req.header('Authorization');
@@ -22,7 +23,7 @@ export function userRoutes(app: HonoApp) {
     if (!user || !user.id || !user.active) {
       throw unauthorized();
     }
-    c.set('user', user);
+    (c.set as any)('user', user);
     await next();
   });
   // --- AUTH ROUTES ---
@@ -50,14 +51,14 @@ export function userRoutes(app: HonoApp) {
     return ok(c, { user: userWithoutPassword, token: user.id });
   });
   app.get('/api/auth/me', async (c) => {
-    const user = c.get('user');
+    const user = ((c.get as any)('user') as User);
     const { password_hash, ...userWithoutPassword } = user;
     return ok(c, userWithoutPassword);
   });
   // --- DASHBOARD ---
   app.get('/api/dashboard', async (c) => {
-    const user = c.get('user');
-    const role = user.role;
+    const user = ((c.get as any)('user') as User);
+    const role = user.role; // inferred as the union of possible roles
     const [suppliersPage, ledgerPage, transactionsPage] = await Promise.all([
       SupplierEntity.list(c.env, null, 500),
       InventoryLedgerEntity.list(c.env, null, 500),
@@ -78,7 +79,7 @@ export function userRoutes(app: HonoApp) {
       auditor: { totalWeight, totalEPR, weeePct, recentLedger, recentTransactions },
     };
     return ok(c, {
-      summary: data[role] || data.operator,
+      summary: data[role as keyof typeof data] || data.operator,
       hardwareStatus: { scale: 'connected', camera: 'healthy' }, // Mock status
       pendingSyncCount: Math.floor(Math.random() * 5), // Mock count
     });
