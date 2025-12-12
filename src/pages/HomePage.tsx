@@ -1,138 +1,87 @@
-// Home page of the app.
-// Currently a demo placeholder "please wait" screen.
-// Replace this file with your actual app UI. Do not delete it to use some other file as homepage. Simply replace the entire contents of this file.
-
-import { useEffect, useMemo, useState } from 'react'
-import { Sparkles } from 'lucide-react'
-
-import { ThemeToggle } from '@/components/ThemeToggle'
-import { HAS_TEMPLATE_DEMO, TemplateDemo } from '@/components/TemplateDemo'
-import { Button } from '@/components/ui/button'
-import { Toaster, toast } from '@/components/ui/sonner'
-
-function formatDuration(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
-
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { ArrowRight, BarChart, HardHat, Link as LinkIcon } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Toaster } from "sonner";
 export function HomePage() {
-  const [coins, setCoins] = useState(0)
-  const [isRunning, setIsRunning] = useState(false)
-  const [startedAt, setStartedAt] = useState<number | null>(null)
-  const [elapsedMs, setElapsedMs] = useState(0)
-
-  useEffect(() => {
-    if (!isRunning || startedAt === null) return
-
-    const t = setInterval(() => {
-      setElapsedMs(Date.now() - startedAt)
-    }, 250)
-
-    return () => clearInterval(t)
-  }, [isRunning, startedAt])
-
-  const formatted = useMemo(() => formatDuration(elapsedMs), [elapsedMs])
-
-  const onPleaseWait = () => {
-    setCoins((c) => c + 1)
-
-    if (!isRunning) {
-      // Resume from the current elapsed time
-      setStartedAt(Date.now() - elapsedMs)
-      setIsRunning(true)
-      toast.success('Building your app…', {
-        description: "Hang tight — we're setting everything up.",
-      })
-      return
-    }
-
-    setIsRunning(false)
-    toast.info('Still working…', {
-      description: 'You can come back in a moment.',
-    })
-  }
-
-  const onReset = () => {
-    setCoins(0)
-    setIsRunning(false)
-    setStartedAt(null)
-    setElapsedMs(0)
-    toast('Reset complete')
-  }
-
-  const onAddCoin = () => {
-    setCoins((c) => c + 1)
-    toast('Coin added')
-  }
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4 overflow-hidden relative">
-      <ThemeToggle />
-      <div className="absolute inset-0 bg-gradient-rainbow opacity-10 dark:opacity-20 pointer-events-none" />
-
-      <div className="text-center space-y-8 relative z-10 animate-fade-in w-full">
-        <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-primary floating">
-            <Sparkles className="w-8 h-8 text-white rotating" />
-          </div>
+    <div className="min-h-screen w-full bg-[#0B0B0B] text-white overflow-hidden">
+      <div className="absolute inset-0 -z-10 h-full w-full bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]"></div>
+      <div className="absolute left-0 top-0 h-96 w-96 bg-[#38761d]/20 blur-[120px] -z-20"></div>
+      <div className="absolute right-0 bottom-0 h-96 w-96 bg-[#38761d]/20 blur-[120px] -z-20"></div>
+      <header className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <HardHat className="text-[#38761d] h-8 w-8" />
+          <h1 className="text-xl font-bold tracking-tighter">SuiteWaste OS</h1>
         </div>
-
-        <div className="space-y-3">
-          <h1 className="text-5xl md:text-7xl font-display font-bold text-balance leading-tight">
-            Creating your <span className="text-gradient">app</span>
-          </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto text-pretty">
-            Your application would be ready soon.
-          </p>
+        <div className="flex items-center gap-2">
+          <ThemeToggle className="relative top-0 right-0" />
+          <Button asChild className="hidden sm:flex bg-[#38761d] text-white hover:bg-[#2f6a1a] transition-colors">
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+              GitHub
+            </a>
+          </Button>
         </div>
-
-        {HAS_TEMPLATE_DEMO ? (
-          <div className="max-w-5xl mx-auto text-left">
-            <TemplateDemo />
-          </div>
-        ) : (
-          <>
+      </header>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="py-24 md:py-32 lg:py-40 text-center">
+          <div className="animate-fade-in space-y-6">
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tighter text-balance">
+              Edge Weighing & Compliance <br /> for Modern Waste Management
+            </h1>
+            <p className="max-w-2xl mx-auto text-lg md:text-xl text-gray-400 text-balance">
+              An offline-first PWA for industrial weight capture, inventory ledger, and EPR-compliant transactions, built on the Cloudflare stack.
+            </p>
             <div className="flex justify-center gap-4">
-              <Button
-                size="lg"
-                onClick={onPleaseWait}
-                className="btn-gradient px-8 py-4 text-lg font-semibold hover:-translate-y-0.5 transition-all duration-200"
-                aria-live="polite"
-              >
-                Please Wait
+              <Button size="lg" asChild className="bg-[#38761d] text-white hover:bg-[#2f6a1a] h-12 px-8 text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-[#38761d]/20">
+                <Link to="/quick-weight">
+                  Go to Quick-Weight POS <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild className="border-gray-700 hover:bg-gray-900 h-12 px-8 text-base font-semibold transition-colors">
+                <a href="#features">Learn More</a>
               </Button>
             </div>
-
-            <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
-              <div>
-                Time elapsed:{' '}
-                <span className="font-medium tabular-nums text-foreground">{formatted}</span>
-              </div>
-              <div>
-                Coins:{' '}
-                <span className="font-medium tabular-nums text-foreground">{coins}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-center gap-2">
-              <Button variant="outline" size="sm" onClick={onReset}>
-                Reset
-              </Button>
-              <Button variant="outline" size="sm" onClick={onAddCoin}>
-                Add Coin
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
-
-      <footer className="absolute bottom-8 text-center text-muted-foreground/80">
-        <p>Powered by Cloudflare</p>
+          </div>
+        </div>
+        <section id="features" className="py-16 md:py-24">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <FeatureCard
+              icon={<LinkIcon className="h-8 w-8 text-[#38761d]" />}
+              title="Offline-First Reliability"
+              description="Capture data even during load-shedding. All transactions are queued locally and synced automatically when connectivity returns."
+            />
+            <FeatureCard
+              icon={<HardHat className="h-8 w-8 text-[#38761d]" />}
+              title="Hardware Agnostic"
+              description="Connect to any industrial scale with a serial output via the Web Serial API. No drivers, no fuss. Just plug and play."
+            />
+            <FeatureCard
+              icon={<BarChart className="h-8 w-8 text-[#38761d]" />}
+              title="Compliance Built-in"
+              description="Embed South African EPR/WEEE compliance metadata directly into your inventory ledger and transaction records for audit-ready reporting."
+            />
+          </div>
+        </section>
+      </main>
+      <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-500">
+        <p>Built with ❤��� at Cloudflare</p>
       </footer>
-
-      <Toaster richColors closeButton />
+      <Toaster richColors theme="dark" />
     </div>
-  )
+  );
+}
+interface FeatureCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}
+function FeatureCard({ icon, title, description }: FeatureCardProps) {
+  return (
+    <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-6 text-center flex flex-col items-center transform hover:-translate-y-2 transition-transform duration-300 ease-in-out">
+      <div className="mb-4">{icon}</div>
+      <h3 className="text-xl font-semibold mb-2">{title}</h3>
+      <p className="text-gray-400">{description}</p>
+    </div>
+  );
 }
