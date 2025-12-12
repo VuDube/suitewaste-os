@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import type { Env } from './core-utils';
 import { SupplierEntity, InventoryLedgerEntity, TransactionEntity } from "./entities";
-import { ok, bad, notFound, isStr } from './core-utils';
-import type { InventoryLedgerEntry, Supplier } from "@shared/types";
+import { ok, bad } from './core-utils';
+import type { InventoryLedgerEntry, Supplier, Transaction } from "@shared/types";
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
   // --- SUPPLIERS ---
   app.get('/api/suppliers', async (c) => {
     await SupplierEntity.ensureSeed(c.env);
-    const page = await SupplierEntity.list(c.env, null, 100); // Fetch up to 100 suppliers
+    const page = await SupplierEntity.list(c.env, null, 100);
     return ok(c, page.items);
   });
   app.post('/api/suppliers', async (c) => {
@@ -35,10 +35,8 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   // --- INVENTORY LEDGER ---
   app.get('/api/ledger', async (c) => {
     await InventoryLedgerEntity.ensureSeed(c.env);
-    const page = await InventoryLedgerEntity.list(c.env, null, 50); // Fetch recent 50
-    // Simple in-memory sort by capture time descending for this example
-    const sortedItems = page.items.sort((a, b) => b.capture_timestamp - a.capture_timestamp);
-    return ok(c, sortedItems);
+    const page = await InventoryLedgerEntity.list(c.env, null, 200); // Fetch more for client-side filtering
+    return ok(c, page.items);
   });
   app.post('/api/ledger', async (c) => {
     const body = await c.req.json<Partial<InventoryLedgerEntry>>();
@@ -51,10 +49,34 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
       material_type: body.material_type,
       weight_kg: body.weight_kg,
       capture_timestamp: body.capture_timestamp || Date.now(),
-      is_synced: true, // When created via API, it's considered synced
+      is_synced: true,
       created_at: Date.now(),
     };
     return ok(c, await InventoryLedgerEntity.create(c.env, newEntry));
+  });
+  // --- TRANSACTIONS ---
+  app.get('/api/transactions', async (c) => {
+    await TransactionEntity.ensureSeed(c.env);
+    const page = await TransactionEntity.list(c.env, null, 200);
+    return ok(c, page.items);
+  });
+  app.post('/api/transactions', async (c) => {
+    const body = await c.req.json<Partial<Transaction>>();
+    if (!body.ledger_entry_id || body.amount == null) {
+      return bad(c, 'ledger_entry_id and amount are required');
+    }
+    const newTransaction: Transaction = {
+      id: body.id || crypto.randomUUID(),
+      ledger_entry_id: body.ledger_entry_id,
+      amount: body.amount,
+      currency: body.currency || 'ZAR',
+      payment_method: body.payment_method,
+      transaction_timestamp: body.transaction_timestamp || Date.now(),
+      epr_fee: body.epr_fee || 0,
+      is_synced: true,
+      created_at: Date.now(),
+    };
+    return ok(c, await TransactionEntity.create(c.env, newTransaction));
   });
   // --- OFFLINE SYNC ---
   app.post('/api/sync/ledger', async (c) => {
@@ -66,18 +88,20 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const errors: { id: string, error: string }[] = [];
     for (const entry of pendingEntries) {
       try {
-        const entryToCreate: InventoryLedgerEntry = {
-          ...entry,
-          is_synced: true, // Mark as synced
-          created_at: entry.created_at || Date.now(),
-        };
-        await InventoryLedgerEntity.create(c.env, entryToCreate);
+        await InventoryLedgerEntity.create(c.env, { ...entry, is_synced: true });
         syncedIds.push(entry.id);
       } catch (e) {
-        console.error(`Failed to sync ledger entry ${entry.id}:`, e);
         errors.push({ id: entry.id, error: e instanceof Error ? e.message : 'Unknown error' });
       }
     }
     return ok(c, { syncedIds, errors });
+  });
+  // --- HARDWARE MOCKS ---
+  app.get('/api/camera/snapshot', async (c) => {
+    // In a real app, you'd fetch from an IP camera using credentials from KV/Secrets
+    // For this demo, we return a random industrial-themed image from Unsplash.
+    const randomId = Math.floor(Math.random() * 1000);
+    const imageUrl = `https://images.unsplash.com/photo-1581092919546-23c1c35a828d?q=80&w=800&auto=format&fit=crop&ixid=${randomId}`;
+    return ok(c, { imageUrl });
   });
 }

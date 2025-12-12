@@ -1,29 +1,15 @@
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ArrowRight, BarChart, HardHat, Link as LinkIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Toaster } from "sonner";
+import { PageLayout } from "@/components/PageLayout";
 export function HomePage() {
   return (
-    <div className="min-h-screen w-full bg-[#0B0B0B] text-white overflow-hidden">
+    <div className="bg-[#0B0B0B] text-white">
       <div className="absolute inset-0 -z-10 h-full w-full bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]"></div>
       <div className="absolute left-0 top-0 h-96 w-96 bg-[#38761d]/20 blur-[120px] -z-20"></div>
       <div className="absolute right-0 bottom-0 h-96 w-96 bg-[#38761d]/20 blur-[120px] -z-20"></div>
-      <header className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <HardHat className="text-[#38761d] h-8 w-8" />
-          <h1 className="text-xl font-bold tracking-tighter">SuiteWaste OS</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle className="relative top-0 right-0" />
-          <Button asChild className="hidden sm:flex bg-[#38761d] text-white hover:bg-[#2f6a1a] transition-colors">
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer">
-              GitHub
-            </a>
-          </Button>
-        </div>
-      </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <PageLayout>
         <div className="py-24 md:py-32 lg:py-40 text-center">
           <div className="animate-fade-in space-y-6">
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tighter text-balance">
@@ -63,10 +49,7 @@ export function HomePage() {
             />
           </div>
         </section>
-      </main>
-      <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-500">
-        <p>Built with ❤��� at Cloudflare</p>
-      </footer>
+      </PageLayout>
       <Toaster richColors theme="dark" />
     </div>
   );
