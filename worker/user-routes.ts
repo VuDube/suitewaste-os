@@ -11,7 +11,7 @@ export function userRoutes(app: HonoApp) {
   // --- AUTH MIDDLEWARE ---
   app.use('/api/*', async (c, next) => {
     const path = c.req.path;
-    if (path === '/api/auth/init' || path === '/api/auth/login') {
+    if (path === '/api/auth/init' || path === '/api/auth/login' || path === '/api/client-errors') {
       return next();
     }
     const authHeader = c.req.header('Authorization');
@@ -54,6 +54,17 @@ export function userRoutes(app: HonoApp) {
     const user = ((c.get as any)('user') as User);
     const { password_hash, ...userWithoutPassword } = user;
     return ok(c, userWithoutPassword);
+  });
+
+  // --- CLIENT ERROR REPORTING (no auth) ---
+  app.post('/api/client-errors', async (c) => {
+    try {
+      const errors = await c.req.json();
+      console.error('[CLIENT-ERRORS]:', errors);
+      return ok(c, { acknowledged: true });
+    } catch (e) {
+      return bad(c, 'Invalid error report');
+    }
   });
   // --- DASHBOARD ---
   app.get('/api/dashboard', async (c) => {

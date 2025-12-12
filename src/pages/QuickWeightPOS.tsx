@@ -15,7 +15,7 @@ import { api } from "@/lib/api-client";
 import type { Supplier } from "@shared/types";
 import { v4 as uuid } from 'uuid';
 import { useAuth } from "@/hooks/useAuth";
-import PageLayout from '@/components/PageLayout';
+import { PageLayout } from '@/components/PageLayout';
 import { Navigate } from "react-router-dom";
 export function QuickWeightPOS() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -91,8 +91,8 @@ export function QuickWeightPOS() {
   }
 return (
   <PageLayout>
-    <div className="w-full h-full flex flex-col bg-background text-foreground p-0 sm:p-2 md:p-4 lg:p-6 pb-20 md:pb-0">
-      <div className="w-full max-w-7xl mx-auto">
+    <div className="w-full flex-1 flex flex-col bg-background text-foreground p-0 pb-16 md:pb-0 overflow-hidden">
+      <>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
           <div className="md:col-span-2">
             <Card className="bg-card/80 border-border backdrop-blur-sm shadow-2xl shadow-black/50">
@@ -178,7 +178,7 @@ return (
             </Card>
           </div>
         </div>
-      </div>
+      </>
       <Toaster richColors theme="dark" />
     </div>
   </PageLayout>
