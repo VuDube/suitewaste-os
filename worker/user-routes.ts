@@ -20,7 +20,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     if (!user || !user.id || !user.active) {
       throw unauthorized();
     }
-    c.set('user', user);
+    // c.set('user', user); // This line is removed as it's unused and causes a TS error.
     await next();
   });
   // --- AUTH ROUTES ---
