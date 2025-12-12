@@ -9,7 +9,7 @@ interface OfflineState {
   pendingLedgerEntries: InventoryLedgerEntry[];
   pendingTransactions: Transaction[];
   isOnline: boolean;
-  addLedgerEntry: (entry: Omit<InventoryLedgerEntry, 'id' | 'is_synced' | 'created_at' | 'capture_timestamp'>) => string;
+  addLedgerEntry: (entry: Omit<InventoryLedgerEntry, 'is_synced' | 'created_at' | 'capture_timestamp'> & { id?: string }) => string;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'is_synced' | 'created_at' | 'transaction_timestamp'>) => void;
   syncAllPending: () => Promise<void>;
   setOnlineStatus: (isOnline: boolean) => void;

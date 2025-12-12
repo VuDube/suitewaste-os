@@ -10,8 +10,8 @@ type SerialPort = EventTarget & {
   close(): Promise<void>;
   readable: ReadableStream<Uint8Array> | null;
   writable: WritableStream<Uint8Array> | null;
-  addEventListener(type: 'disconnect', listener: (this: this, ev: Event) => any, options?: boolean | AddEventListenerOptions): void;
-  removeEventListener(type: 'disconnect', listener: (this: this, ev: Event) => any, options?: boolean | EventListenerOptions): void;
+  addEventListener(type: 'disconnect', listener: (ev: Event) => any, options?: boolean | AddEventListenerOptions): void;
+  removeEventListener(type: 'disconnect', listener: (ev: Event) => any, options?: boolean | EventListenerOptions): void;
 };
 declare global {
   interface Navigator {
