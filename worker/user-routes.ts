@@ -51,6 +51,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
       capture_timestamp: body.capture_timestamp || Date.now(),
       is_synced: true,
       created_at: Date.now(),
+      notes: body.notes,
     };
     return ok(c, await InventoryLedgerEntity.create(c.env, newEntry));
   });
@@ -92,6 +93,23 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         syncedIds.push(entry.id);
       } catch (e) {
         errors.push({ id: entry.id, error: e instanceof Error ? e.message : 'Unknown error' });
+      }
+    }
+    return ok(c, { syncedIds, errors });
+  });
+  app.post('/api/sync/transactions', async (c) => {
+    const { pendingTransactions } = await c.req.json<{ pendingTransactions: Transaction[] }>();
+    if (!Array.isArray(pendingTransactions) || pendingTransactions.length === 0) {
+      return bad(c, 'pendingTransactions must be a non-empty array');
+    }
+    const syncedIds: string[] = [];
+    const errors: { id: string, error: string }[] = [];
+    for (const tx of pendingTransactions) {
+      try {
+        await TransactionEntity.create(c.env, { ...tx, is_synced: true });
+        syncedIds.push(tx.id);
+      } catch (e) {
+        errors.push({ id: tx.id, error: e instanceof Error ? e.message : 'Unknown error' });
       }
     }
     return ok(c, { syncedIds, errors });

@@ -8,16 +8,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSerialScale } from "@/hooks/useSerialScale";
 import { useOfflineStore } from "@/stores/useOfflineStore";
 import { cn } from "@/lib/utils";
-import { Cable, CheckCircle, CircleDashed, Loader2, Send, XCircle } from "lucide-react";
+import { Cable, CheckCircle, CircleDashed, Send, XCircle } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import type { Supplier } from "@shared/types";
+import { v4 as uuid } from 'uuid';
 export function QuickWeightPOS() {
   const { weight, status, connect } = useSerialScale();
-  const { addLedgerEntry, syncPendingEntries, pendingLedgerEntries } = useOfflineStore();
+  const addLedgerEntry = useOfflineStore(s => s.addLedgerEntry);
+  const addTransaction = useOfflineStore(s => s.addTransaction);
+  const syncAllPending = useOfflineStore(s => s.syncAllPending);
+  const totalPending = useOfflineStore(s => s.totalPending());
   const [supplierId, setSupplierId] = useState<string | undefined>();
   const [materialType, setMaterialType] = useState("");
+  const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const { data: suppliers, isLoading: isLoadingSuppliers } = useQuery({
     queryKey: ['suppliers'],
@@ -40,14 +45,29 @@ export function QuickWeightPOS() {
       toast.error("Please enter a material type.");
       return;
     }
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount < 0) {
+      toast.error("Please enter a valid amount.");
+      return;
+    }
+    const ledgerEntryId = uuid();
+    const eprFee = weight * 0.1; // Mock EPR fee calculation
     addLedgerEntry({
+      id: ledgerEntryId,
       supplier_id: supplierId,
       material_type: materialType.trim(),
       weight_kg: weight,
-      // notes are not part of the ledger entry schema, handle separately if needed
+      notes: notes.trim(),
+    });
+    addTransaction({
+      ledger_entry_id: ledgerEntryId,
+      amount: parsedAmount,
+      epr_fee: eprFee,
+      currency: 'ZAR',
     });
     // Reset form
     setMaterialType("");
+    setAmount("");
     setNotes("");
   };
   const statusIndicator = {
@@ -86,11 +106,11 @@ export function QuickWeightPOS() {
                 <div className="w-full flex flex-col sm:flex-row gap-4">
                   <Button
                     size="lg"
-                    className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 h-14 text-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-ring"
+                    className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 h-14 text-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-ring shadow-lg shadow-primary/20"
                     onClick={handleCapture}
                     disabled={status !== 'connected' && status !== 'parsing'}
                   >
-                    Capture Weight
+                    Capture Weight & Transaction
                   </Button>
                   <Button
                     size="lg"
@@ -129,13 +149,17 @@ export function QuickWeightPOS() {
                   <label htmlFor="material" className="text-sm font-medium text-muted-foreground mb-1 block">Material Type</label>
                   <Input id="material" placeholder="e.g., Copper Wire" value={materialType} onChange={e => setMaterialType(e.target.value)} className="bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring" />
                 </div>
+                 <div>
+                  <label htmlFor="amount" className="text-sm font-medium text-muted-foreground mb-1 block">Amount (ZAR)</label>
+                  <Input id="amount" type="number" placeholder="e.g., 1250.50" value={amount} onChange={e => setAmount(e.target.value)} className="bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring" />
+                </div>
                 <div>
                   <label htmlFor="notes" className="text-sm font-medium text-muted-foreground mb-1 block">Notes</label>
                   <Textarea id="notes" placeholder="Optional notes..." value={notes} onChange={e => setNotes(e.target.value)} className="bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring" />
                 </div>
-                <Button onClick={syncPendingEntries} className="w-full" disabled={pendingLedgerEntries.length === 0}>
+                <Button onClick={syncAllPending} className="w-full" disabled={totalPending === 0}>
                   <Send className="mr-2 h-4 w-4" />
-                  Sync {pendingLedgerEntries.length} Pending
+                  Sync {totalPending} Pending
                 </Button>
               </CardContent>
             </Card>

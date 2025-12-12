@@ -1,10 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { HardHat, Menu, X, LayoutDashboard, Weight, Users, BookOpen, Settings2 } from 'lucide-react';
+import { HardHat, Menu, X, LayoutDashboard, Weight, Users, BookOpen, Settings2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: Array<string>;
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed',
+    platform: string,
+  }>;
+  prompt(): Promise<void>;
+}
 const navItems = [
   { href: '/', label: 'Home', icon: LayoutDashboard },
   { href: '/quick-weight', label: 'Quick-Weight', icon: Weight },
@@ -13,8 +21,31 @@ const navItems = [
   { href: '/transactions', label: 'Transactions', icon: BookOpen },
   { href: '/hardware', label: 'Hardware', icon: Settings2 },
 ];
+function usePWAInstall() {
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setInstallPrompt(null);
+    }
+  };
+  return { installPrompt, handleInstall };
+}
 export function GlobalNav() {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { installPrompt, handleInstall } = usePWAInstall();
   const NavLinks = ({ className }: { className?: string }) => (
     navItems.map((item) => (
       <NavLink
@@ -50,28 +81,27 @@ export function GlobalNav() {
             </nav>
           </div>
           <div className="flex items-center gap-2">
+            {installPrompt && (
+              <Button onClick={handleInstall} variant="outline" size="sm" className="hidden sm:flex">
+                <Download className="mr-2 h-4 w-4" /> Install App
+              </Button>
+            )}
             <ThemeToggle className="relative top-0 right-0" />
             <div className="md:hidden">
               <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Menu className="h-6 w-6" />
-                    <span className="sr-only">Open menu</span>
-                  </Button>
-                </SheetTrigger>
+                <SheetTrigger asChild><Button variant="ghost" size="icon"><Menu className="h-6 w-6" /><span className="sr-only">Open menu</span></Button></SheetTrigger>
                 <SheetContent side="right" className="w-full max-w-xs">
                   <div className="flex justify-between items-center mb-6">
-                    <Link to="/" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
-                      <HardHat className="h-7 w-7 text-primary" />
-                      <span className="text-lg font-bold tracking-tighter">SuiteWaste OS</span>
-                    </Link>
-                    <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}>
-                      <X className="h-6 w-6" />
-                      <span className="sr-only">Close menu</span>
-                    </Button>
+                    <Link to="/" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}><HardHat className="h-7 w-7 text-primary" /><span className="text-lg font-bold tracking-tighter">SuiteWaste OS</span></Link>
+                    <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}><X className="h-6 w-6" /><span className="sr-only">Close menu</span></Button>
                   </div>
                   <nav className="flex flex-col gap-2">
                     <NavLinks className="text-base" />
+                    {installPrompt && (
+                      <Button onClick={handleInstall} variant="outline" className="mt-4">
+                        <Download className="mr-2 h-4 w-4" /> Install App
+                      </Button>
+                    )}
                   </nav>
                 </SheetContent>
               </Sheet>

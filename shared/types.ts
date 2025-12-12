@@ -25,6 +25,7 @@ export interface InventoryLedgerEntry {
   operator_id?: string;
   device_id?: string;
   photo_attachment_key?: string;
+  notes?: string;
   is_synced: boolean;
   created_at: number; // epoch millis
 }
