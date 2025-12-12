@@ -1,15 +1,67 @@
-import type { User, Chat, ChatMessage } from './types';
-
-export const MOCK_USERS: User[] = [
-  { id: 'u1', name: 'User A' },
-  { id: 'u2', name: 'User B' }
+import type { Supplier, InventoryLedgerEntry, Transaction } from './types';
+import { v4 as uuid } from 'uuid';
+export const MOCK_SUPPLIERS: Supplier[] = [
+  {
+    id: uuid(),
+    name: 'Jozi Scrap Metals',
+    contact_person: 'John Doe',
+    phone_number: '011 123 4567',
+    email: 'john@joziscrap.co.za',
+    address: '123 Main Reef Rd, Johannesburg, 2001',
+    epr_number: 'EPR123/ZA',
+    is_weee_compliant: true,
+    created_at: Date.now(),
+    updated_at: Date.now(),
+  },
+  {
+    id: uuid(),
+    name: 'Cape Town Recycling Co.',
+    contact_person: 'Jane Smith',
+    phone_number: '021 987 6543',
+    email: 'jane@ctrecycling.co.za',
+    address: '45 Marine Drive, Cape Town, 8001',
+    epr_number: 'EPR456/ZA',
+    is_weee_compliant: true,
+    created_at: Date.now() - 86400000,
+    updated_at: Date.now() - 86400000,
+  },
+  {
+    id: uuid(),
+    name: 'Durban Waste Warriors',
+    contact_person: 'Sam Wilson',
+    phone_number: '031 555 8888',
+    email: 'sam@durbanwaste.co.za',
+    address: '78 Industrial Park, Durban, 4001',
+    epr_number: 'EPR789/ZA',
+    is_weee_compliant: false,
+    created_at: Date.now() - 172800000,
+    updated_at: Date.now() - 172800000,
+  },
 ];
-
-export const MOCK_CHATS: Chat[] = [
-  { id: 'c1', title: 'General' },
+const ledgerEntry1Id = uuid();
+export const MOCK_INVENTORY_LEDGER: InventoryLedgerEntry[] = [
+  {
+    id: ledgerEntry1Id,
+    supplier_id: MOCK_SUPPLIERS[0].id,
+    material_type: 'Copper Wire',
+    weight_kg: 125.5,
+    capture_timestamp: Date.now(),
+    operator_id: 'op-001',
+    device_id: 'scale-01',
+    is_synced: true,
+    created_at: Date.now(),
+  },
 ];
-
-export const MOCK_CHAT_MESSAGES: ChatMessage[] = [
-  { id: 'm1', chatId: 'c1', userId: 'u1', text: 'Hello', ts: Date.now() },
+export const MOCK_TRANSACTIONS: Transaction[] = [
+  {
+    id: uuid(),
+    ledger_entry_id: ledgerEntry1Id,
+    amount: 7530.00,
+    currency: 'ZAR',
+    payment_method: 'EFT',
+    transaction_timestamp: Date.now(),
+    epr_fee: 12.55,
+    is_synced: true,
+    created_at: Date.now(),
+  },
 ];
-  

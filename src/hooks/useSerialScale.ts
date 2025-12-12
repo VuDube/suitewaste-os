@@ -1,72 +1,127 @@
-import { useState, useCallback } from 'react';
-type ScaleStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
+type ScaleStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'parsing';
 interface SerialScale {
   weight: number;
   status: ScaleStatus;
-  connect: () => void;
-  disconnect: () => void;
+  connect: () => Promise<void>;
+  disconnect: () => Promise<void>;
 }
-/**
- * A hook to manage connection to a serial scale using the Web Serial API.
- * This is a placeholder implementation. The full implementation will require
- * handling the Web Serial API lifecycle, parsing data streams, and error handling.
- *
- * @returns {SerialScale} An object containing the current weight, connection status,
- * and functions to connect/disconnect.
- */
+// Common scale data patterns:
+// - Mettler Toledo: "ST,GS,  10.123 kg\r\n" (Stable, Gross) or "US,GS,  -0.123 kg\r\n" (Unstable)
+// - Generic: "10.12 kg", "Weight: 10.123kg"
+const WEIGHT_REGEX = /(\d+\.\d+)/;
 export function useSerialScale(): SerialScale {
   const [weight, setWeight] = useState<number>(0.0);
   const [status, setStatus] = useState<ScaleStatus>('disconnected');
-  // In a real implementation, we would store the serial port object in state or a ref.
-  // const [port, setPort] = useState<SerialPort | null>(null);
-  /**
-   * Initiates a connection to a serial device.
-   * This function would prompt the user to select a serial port.
-   */
-  const connect = useCallback(async () => {
-    // Web Serial API is only available in secure contexts (HTTPS)
-    if ('serial' in navigator) {
-      setStatus('connecting');
+  const portRef = useRef<SerialPort | null>(null);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const keepReadingRef = useRef<boolean>(true);
+  const readLoop = useCallback(async () => {
+    if (!portRef.current || !readerRef.current) return;
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    setStatus('parsing');
+    while (portRef.current.readable && keepReadingRef.current) {
       try {
-        // TODO: Full Web Serial API implementation
-        // 1. Request a port from the user.
-        // const serialPort = await navigator.serial.requestPort();
-        // 2. Open the port.
-        // await serialPort.open({ baudRate: 9600 });
-        // 3. Set up a reader to listen for incoming data.
-        // const reader = serialPort.readable.getReader();
-        // 4. Loop to read data, parse it, and update weight state.
-        // 5. Handle disconnects gracefully.
-        // For this stub, we'll simulate a successful connection after a delay.
-        setTimeout(() => {
-          setStatus('connected');
-          // Simulate some weight data
-          const interval = setInterval(() => {
-            setWeight(Math.random() * 100);
-          }, 500);
-          // In a real implementation, you'd clear this interval on disconnect.
-        }, 1500);
-      } catch (err) {
-        console.error("Error connecting to serial port:", err);
+        const { value, done } = await readerRef.current.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(/[\r\n]+/);
+        if (lines.length > 1) {
+          const completeLine = lines[lines.length - 2]; // Process the second to last line
+          const match = completeLine.match(WEIGHT_REGEX);
+          if (match && match[1]) {
+            const parsedWeight = parseFloat(match[1]);
+            setWeight(parsedWeight);
+          }
+          buffer = lines[lines.length - 1]; // Keep the last partial line
+        }
+      } catch (error) {
+        console.error('Error during read loop:', error);
+        toast.error('Scale read error', { description: 'The connection was lost.' });
         setStatus('error');
-        setWeight(0);
+        break;
       }
-    } else {
-      console.warn("Web Serial API not supported in this browser.");
-      alert("Web Serial API is not supported. Please use a compatible browser like Chrome or Edge.");
-      setStatus('error');
     }
   }, []);
-  /**
-   * Disconnects from the currently connected serial port.
-   */
+  const connect = useCallback(async () => {
+    if (!('serial' in navigator)) {
+      toast.error('Web Serial API not supported', {
+        description: 'Please use a compatible browser like Chrome or Edge.',
+      });
+      setStatus('error');
+      return;
+    }
+    if (portRef.current) {
+      toast.info('A scale is already connected.');
+      return;
+    }
+    setStatus('connecting');
+    try {
+      const port = await navigator.serial.requestPort();
+      portRef.current = port;
+      // Try common baud rates
+      try {
+        await port.open({ baudRate: 9600 });
+      } catch (e) {
+        console.warn('Failed to open at 9600 baud, trying 19200');
+        await port.open({ baudRate: 19200 });
+      }
+      keepReadingRef.current = true;
+      port.addEventListener('disconnect', () => {
+        toast.warning('Scale disconnected.');
+        disconnect();
+      });
+      if (port.readable) {
+        readerRef.current = port.readable.getReader();
+        setStatus('connected');
+        toast.success('Scale connected successfully!');
+        readLoop();
+      }
+    } catch (err) {
+      setStatus('error');
+      if (err instanceof Error && err.name !== 'NotFoundError') {
+        toast.error('Failed to connect to scale', { description: err.message });
+      } else {
+        setStatus('disconnected'); // User cancelled the dialog
+      }
+      portRef.current = null;
+    }
+  }, [readLoop]);
   const disconnect = useCallback(async () => {
-    // TODO: Full Web Serial API implementation
-    // 1. Cancel the reader.
-    // 2. Close the port.
-    // 3. Update state.
+    keepReadingRef.current = false;
+    if (readerRef.current) {
+      try {
+        await readerRef.current.cancel();
+      } catch (error) {
+        // Ignore cancel error
+      } finally {
+        readerRef.current.releaseLock();
+        readerRef.current = null;
+      }
+    }
+    if (portRef.current) {
+      try {
+        await portRef.current.close();
+      } catch (error) {
+        console.error('Failed to close port:', error);
+      } finally {
+        portRef.current = null;
+      }
+    }
     setStatus('disconnected');
-    setWeight(0);
+    setWeight(0.0);
   }, []);
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount
+      if (portRef.current) {
+        disconnect();
+      }
+    };
+  }, [disconnect]);
   return { weight, status, connect, disconnect };
 }

@@ -1,41 +1,47 @@
-/**
- * Minimal real-world demo: One Durable Object instance per entity (User, ChatBoard), with Indexes for listing.
- */
 import { IndexedEntity } from "./core-utils";
-import type { User, Chat, ChatMessage } from "@shared/types";
-import { MOCK_CHAT_MESSAGES, MOCK_CHATS, MOCK_USERS } from "@shared/mock-data";
-
-// USER ENTITY: one DO instance per user
-export class UserEntity extends IndexedEntity<User> {
-  static readonly entityName = "user";
-  static readonly indexName = "users";
-  static readonly initialState: User = { id: "", name: "" };
-  static seedData = MOCK_USERS;
+import type { Supplier, InventoryLedgerEntry, Transaction } from "@shared/types";
+import { MOCK_SUPPLIERS, MOCK_INVENTORY_LEDGER, MOCK_TRANSACTIONS } from "@shared/mock-data";
+// SUPPLIER ENTITY
+export class SupplierEntity extends IndexedEntity<Supplier> {
+  static readonly entityName = "supplier";
+  static readonly indexName = "suppliers";
+  static readonly initialState: Supplier = {
+    id: "",
+    name: "",
+    is_weee_compliant: false,
+    created_at: 0,
+    updated_at: 0,
+  };
+  static seedData = MOCK_SUPPLIERS;
 }
-
-// CHAT BOARD ENTITY: one DO instance per chat board, stores its own messages
-export type ChatBoardState = Chat & { messages: ChatMessage[] };
-
-const SEED_CHAT_BOARDS: ChatBoardState[] = MOCK_CHATS.map(c => ({
-  ...c,
-  messages: MOCK_CHAT_MESSAGES.filter(m => m.chatId === c.id),
-}));
-
-export class ChatBoardEntity extends IndexedEntity<ChatBoardState> {
-  static readonly entityName = "chat";
-  static readonly indexName = "chats";
-  static readonly initialState: ChatBoardState = { id: "", title: "", messages: [] };
-  static seedData = SEED_CHAT_BOARDS;
-
-  async listMessages(): Promise<ChatMessage[]> {
-    const { messages } = await this.getState();
-    return messages;
-  }
-
-  async sendMessage(userId: string, text: string): Promise<ChatMessage> {
-    const msg: ChatMessage = { id: crypto.randomUUID(), chatId: this.id, userId, text, ts: Date.now() };
-    await this.mutate(s => ({ ...s, messages: [...s.messages, msg] }));
-    return msg;
-  }
+// INVENTORY LEDGER ENTITY
+export class InventoryLedgerEntity extends IndexedEntity<InventoryLedgerEntry> {
+  static readonly entityName = "inventory_ledger";
+  static readonly indexName = "inventory_ledger_entries";
+  static readonly initialState: InventoryLedgerEntry = {
+    id: "",
+    supplier_id: "",
+    material_type: "",
+    weight_kg: 0,
+    capture_timestamp: 0,
+    is_synced: false,
+    created_at: 0,
+  };
+  static seedData = MOCK_INVENTORY_LEDGER;
 }
-
+// TRANSACTION ENTITY
+export class TransactionEntity extends IndexedEntity<Transaction> {
+  static readonly entityName = "transaction";
+  static readonly indexName = "transactions";
+  static readonly initialState: Transaction = {
+    id: "",
+    ledger_entry_id: "",
+    amount: 0,
+    currency: "ZAR",
+    transaction_timestamp: 0,
+    epr_fee: 0,
+    is_synced: false,
+    created_at: 0,
+  };
+  static seedData = MOCK_TRANSACTIONS;
+}
