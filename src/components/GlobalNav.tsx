@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import { HardHat, Menu, X, LayoutDashboard, Weight, Users, BookOpen, Settings2, Download, LogOut } from 'lucide-react';
+import { HardHat, Menu, LayoutDashboard, Weight, Users, BookOpen, Settings2, Download, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -71,7 +71,7 @@ export function GlobalNav() {
     </nav>
   );
   const MobileNavLinks = () => (
-    <nav className="grid grid-cols-4 gap-1">
+    <nav className="grid grid-cols-3 gap-2">
       {accessibleNavItems.map((item) => (
         <NavLink
           key={item.href}
@@ -79,12 +79,12 @@ export function GlobalNav() {
           onClick={() => setMobileMenuOpen(false)}
           className={({ isActive }) =>
             cn(
-              "flex flex-col items-center justify-center gap-1 rounded-lg p-2 h-16 text-xs font-medium transition-colors",
+              "flex flex-col items-center justify-center gap-1 rounded-lg p-2 h-20 text-xs font-medium transition-colors",
               isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             )
           }
         >
-          <item.icon className="h-5 w-5" />
+          <item.icon className="h-6 w-6" />
           <span>{item.label}</span>
         </NavLink>
       ))}
@@ -107,40 +107,37 @@ export function GlobalNav() {
                 <Button onClick={handleInstall} variant="outline" size="sm"><Download className="mr-2 h-4 w-4" /> Install</Button>
               )}
               <ThemeToggle className="relative top-0 right-0" />
-              <Button onClick={handleLogout} variant="ghost" size="icon"><LogOut className="h-5 w-5" /></Button>
+              <Button onClick={handleLogout} variant="ghost" size="icon" aria-label="Logout"><LogOut className="h-5 w-5" /></Button>
             </div>
           </div>
         </div>
       </header>
       {/* Mobile Bottom Nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-background/95 backdrop-blur-sm border-t z-50">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-background/95 backdrop-blur-sm border-t z-50 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.3)]">
          <div className="grid h-full max-w-lg grid-cols-5 mx-auto">
             {accessibleNavItems.slice(0, 4).map(item => (
-                 <NavLink key={item.href} to={item.href} className={({isActive}) => cn("inline-flex flex-col items-center justify-center px-5 hover:bg-accent group", isActive ? "text-primary" : "text-muted-foreground")}>
-                    <item.icon className="w-5 h-5 mb-1" />
-                    <span className="text-xs">{item.label}</span>
+                 <NavLink key={item.href} to={item.href} className={({isActive}) => cn("inline-flex flex-col items-center justify-center px-1 hover:bg-accent group transition-colors duration-200", isActive ? "text-primary" : "text-muted-foreground")}>
+                    <item.icon className="w-6 h-6 mb-1" />
+                    <span className="text-xs sr-only sm:not-sr-only">{item.label}</span>
                 </NavLink>
             ))}
              <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
-                    <button type="button" className="inline-flex flex-col items-center justify-center px-5 hover:bg-accent group text-muted-foreground">
-                        <Menu className="w-5 h-5 mb-1" />
-                        <span className="text-xs">More</span>
+                    <button type="button" className="inline-flex flex-col items-center justify-center px-1 hover:bg-accent group text-muted-foreground">
+                        <Menu className="w-6 h-6 mb-1" />
+                        <span className="text-xs sr-only sm:not-sr-only">More</span>
                     </button>
                 </SheetTrigger>
-                <SheetContent side="bottom" className="h-auto rounded-t-lg">
-                    <div className="p-4">
-                        <MobileNavLinks />
-                        <div className="mt-4 grid grid-cols-2 gap-2">
-                            {installPrompt && <Button onClick={handleInstall} variant="outline"><Download className="mr-2 h-4 w-4" /> Install App</Button>}
-                            <Button onClick={handleLogout} variant="outline"><LogOut className="mr-2 h-4 w-4" /> Logout</Button>
-                        </div>
+                <SheetContent side="bottom" className="h-auto rounded-t-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                    <MobileNavLinks />
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                        {installPrompt && <Button onClick={handleInstall} variant="outline" className="h-12"><Download className="mr-2 h-4 w-4" /> Install App</Button>}
+                        <Button onClick={handleLogout} variant="outline" className="h-12"><LogOut className="mr-2 h-4 w-4" /> Logout</Button>
                     </div>
                 </SheetContent>
             </Sheet>
          </div>
       </div>
-      <div className="md:hidden pb-16"></div> {/* Spacer for bottom nav */}
     </>
   );
 }

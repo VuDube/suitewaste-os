@@ -21,16 +21,19 @@ import { Login } from '@/pages/Login';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
+      staleTime: 30 * 1000, // 30 seconds
+      gcTime: 5 * 60 * 1000, // 5 minutes
       retry: (failureCount, error) => {
         if ((error as any)?.status === 404 || (error as any)?.status === 401) return false;
         return failureCount < 2;
       },
-      refetchOnWindowFocus: import.meta.env.PROD,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
     },
   },
 });
+// Expose queryClient globally for use in stores
+(window as any).queryClient = queryClient;
 const router = createBrowserRouter([
   { path: "/", element: <Dashboard />, errorElement: <RouteErrorBoundary /> },
   { path: "/login", element: <Login />, errorElement: <RouteErrorBoundary /> },

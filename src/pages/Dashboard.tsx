@@ -3,17 +3,16 @@ import { Link } from 'react-router-dom';
 import { api } from '@/lib/api-client';
 import { useAuth } from '@/hooks/useAuth';
 import { PageLayout } from '@/components/PageLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowRight, BarChart, Bell, BookOpen, Cable, Camera, HardHat, PieChart, Users, Weight } from 'lucide-react';
+import { ArrowRight, BarChart, Bell, BookOpen, Cable, Camera, Users, Weight, PieChart as PieChartIcon } from 'lucide-react';
 import { format } from 'date-fns';
-import { ResponsiveContainer, Pie, Cell, Tooltip } from 'recharts';
-import type { InventoryLedgerEntry, Supplier, Transaction, User } from '@shared/types';
-const COLORS = ['#38761d', '#5a9a47', '#7cb870', '#a0d69a'];
+import type { InventoryLedgerEntry, Supplier, Transaction } from '@shared/types';
+import { useOfflineStore } from '@/stores/useOfflineStore';
 const KpiCard = ({ title, value, icon: Icon, isLoading }: { title: string; value: string | number; icon: React.ElementType; isLoading: boolean }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -21,7 +20,7 @@ const KpiCard = ({ title, value, icon: Icon, isLoading }: { title: string; value
       <Icon className="h-4 w-4 text-muted-foreground" />
     </CardHeader>
     <CardContent>
-      {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{value}</div>}
+      {isLoading ? <Skeleton className="h-10 w-3/4" /> : <div className="text-[clamp(1.5rem,6vw,2.5rem)] font-bold">{value}</div>}
     </CardContent>
   </Card>
 );
@@ -32,19 +31,22 @@ const RecentActivityTable = ({ title, data, columns, isLoading, viewAllLink }: {
       {viewAllLink && <Button asChild variant="link" className="text-primary"><Link to={viewAllLink}>View All <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>}
     </CardHeader>
     <CardContent>
-      <Table>
-        <TableHeader><TableRow>{columns.map(c => <TableHead key={c.header}>{c.header}</TableHead>)}</TableRow></TableHeader>
-        <TableBody>
-          {isLoading ? Array.from({ length: 3 }).map((_, i) => <TableRow key={i}>{columns.map((c, j) => <TableCell key={j}><Skeleton className="h-6 w-full" /></TableCell>)}</TableRow>)
-           : data.length > 0 ? data.map((item, i) => <TableRow key={i}>{columns.map(c => <TableCell key={c.header}>{c.accessor(item)}</TableCell>)}</TableRow>)
-           : <TableRow><TableCell colSpan={columns.length} className="text-center h-24">No recent activity.</TableCell></TableRow>}
-        </TableBody>
-      </Table>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader><TableRow>{columns.map(c => <TableHead key={c.header}>{c.header}</TableHead>)}</TableRow></TableHeader>
+          <TableBody>
+            {isLoading ? Array.from({ length: 3 }).map((_, i) => <TableRow key={i}>{columns.map((c, j) => <TableCell key={j}><Skeleton className="h-6 w-full" /></TableCell>)}</TableRow>)
+             : data && data.length > 0 ? data.map((item, i) => <TableRow key={i}>{columns.map(c => <TableCell key={c.header}>{c.accessor(item)}</TableCell>)}</TableRow>)
+             : <TableRow><TableCell colSpan={columns.length} className="text-center h-24">No recent activity.</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      </div>
     </CardContent>
   </Card>
 );
 export function Dashboard() {
   const { user } = useAuth();
+  const totalPending = useOfflineStore(s => s.totalPending());
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api<any>('/api/dashboard'),
@@ -56,7 +58,7 @@ export function Dashboard() {
     switch (user.role) {
       case 'operator':
         return (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3">
             <Card className="md:col-span-2 lg:col-span-3 bg-primary text-primary-foreground">
               <CardHeader><CardTitle>Operator Quick Actions</CardTitle></CardHeader>
               <CardContent className="flex flex-col sm:flex-row gap-4 items-center">
@@ -82,7 +84,7 @@ export function Dashboard() {
         );
       case 'manager':
         return (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-4">
             <KpiCard title="Total Weight (kg)" value={summary.totalWeight?.toFixed(2) || 0} icon={Weight} isLoading={isLoading} />
             <KpiCard title="Total Value (ZAR)" value={`R ${summary.totalValue?.toFixed(2) || 0}`} icon={BarChart} isLoading={isLoading} />
             <KpiCard title="Total EPR Fees (ZAR)" value={`R ${summary.totalEPR?.toFixed(2) || 0}`} icon={BookOpen} isLoading={isLoading} />
@@ -98,10 +100,10 @@ export function Dashboard() {
         );
       case 'admin':
         return (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-4">
             <KpiCard title="Total Weight (kg)" value={summary.totalWeight?.toFixed(2) || 0} icon={Weight} isLoading={isLoading} />
             <KpiCard title="Total Value (ZAR)" value={`R ${summary.totalValue?.toFixed(2) || 0}`} icon={BarChart} isLoading={isLoading} />
-            <KpiCard title="WEEE Compliance" value={`${summary.weeePct?.toFixed(1) || 0}%`} icon={PieChart} isLoading={isLoading} />
+            <KpiCard title="WEEE Compliance" value={`${summary.weeePct?.toFixed(1) || 0}%`} icon={PieChartIcon} isLoading={isLoading} />
             <KpiCard title="Active Users" value={summary.userCount || 0} icon={Users} isLoading={isLoading} />
             <RecentActivityTable title="Recent Suppliers" data={summary.recentSuppliers || []} isLoading={isLoading} viewAllLink="/suppliers"
               columns={[
@@ -114,10 +116,10 @@ export function Dashboard() {
         );
       case 'auditor':
         return (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3">
             <KpiCard title="Total Weight Audited (kg)" value={summary.totalWeight?.toFixed(2) || 0} icon={Weight} isLoading={isLoading} />
             <KpiCard title="Total EPR Fees (ZAR)" value={`R ${summary.totalEPR?.toFixed(2) || 0}`} icon={BookOpen} isLoading={isLoading} />
-            <KpiCard title="WEEE Compliance" value={`${summary.weeePct?.toFixed(1) || 0}%`} icon={PieChart} isLoading={isLoading} />
+            <KpiCard title="WEEE Compliance" value={`${summary.weeePct?.toFixed(1) || 0}%`} icon={PieChartIcon} isLoading={isLoading} />
             <RecentActivityTable title="Recent Ledger Entries" data={summary.recentLedger || []} isLoading={isLoading} viewAllLink="/ledger"
               columns={[
                 { header: 'Material', accessor: (l: InventoryLedgerEntry) => l.material_type },
@@ -139,11 +141,11 @@ export function Dashboard() {
             <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
             <p className="text-muted-foreground">Welcome back, {user?.username}! Here's your overview.</p>
           </div>
-          {dashboardData?.pendingSyncCount > 0 && (
+          {totalPending > 0 && (
             <Alert variant="default" className="w-full sm:w-auto bg-yellow-500/10 border-yellow-500/50 text-yellow-200">
               <Bell className="h-4 w-4 !text-yellow-400" />
               <AlertTitle>Pending Sync</AlertTitle>
-              <AlertDescription>{dashboardData.pendingSyncCount} items are waiting to be synced.</AlertDescription>
+              <AlertDescription>{totalPending} items are waiting to be synced.</AlertDescription>
             </Alert>
           )}
         </div>

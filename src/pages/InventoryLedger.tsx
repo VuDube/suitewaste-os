@@ -61,25 +61,25 @@ export function InventoryLedger() {
       <div className="space-y-8">
         <h1 className="text-3xl font-bold tracking-tight">Inventory Ledger</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card><CardHeader><CardTitle>Weight by Material (kg)</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><PieChart><Pie data={weightByMaterial} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8" label>{weightByMaterial.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer></CardContent></Card>
-          <Card><CardHeader><CardTitle>Weight by Supplier (kg)</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><BarChart data={weightBySupplier}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Legend /><Bar dataKey="value" fill="#38761d" /></BarChart></ResponsiveContainer></CardContent></Card>
+          <Card><CardHeader><CardTitle>Weight by Material (kg)</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300} className="!min-h-[250px] md:min-h-[300px]"><PieChart><Pie data={weightByMaterial} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8" labelLine={false} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>{weightByMaterial.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer></CardContent></Card>
+          <Card><CardHeader><CardTitle>Weight by Supplier (kg)</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300} className="!min-h-[250px] md:min-h-[300px]"><BarChart data={weightBySupplier}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} angle={-30} textAnchor="end" height={70} /><YAxis /><Tooltip /><Legend /><Bar dataKey="value" fill="#38761d" /></BarChart></ResponsiveContainer></CardContent></Card>
         </div>
         <Card>
           <CardHeader>
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
               <CardTitle>All Entries</CardTitle>
-              <div className="flex flex-wrap gap-2">
-                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full sm:w-auto" />
-                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full sm:w-auto" />
-                <Input placeholder="Filter by material..." value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="w-full sm:w-auto" />
-                {isLoadingSuppliers ? <Skeleton className="h-10 w-[180px]" /> : (
-                  <Select value={supplierFilter} onValueChange={setSupplierFilter}><SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by supplier" /></SelectTrigger><SelectContent><SelectItem value="all">All Suppliers</SelectItem>{suppliers?.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:flex gap-2 w-full">
+                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full sm:w-auto h-14" />
+                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full sm:w-auto h-14" />
+                <Input placeholder="Filter by material..." value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="w-full sm:w-auto h-14" />
+                {isLoadingSuppliers ? <Skeleton className="h-14 w-full sm:w-[180px]" /> : (
+                  <Select value={supplierFilter} onValueChange={setSupplierFilter}><SelectTrigger className="w-full sm:w-[180px] h-14"><SelectValue placeholder="Filter by supplier" /></SelectTrigger><SelectContent><SelectItem value="all">All Suppliers</SelectItem>{suppliers?.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>
                 )}
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg overflow-x-auto">
+            <div className="min-w-full overflow-x-auto border rounded-lg">
               <Table>
                 <TableHeader><TableRow><TableHead>Timestamp</TableHead><TableHead>Supplier</TableHead><TableHead>Material</TableHead><TableHead className="text-right">Weight (kg)</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
                 <TableBody>

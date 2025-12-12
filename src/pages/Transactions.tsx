@@ -31,7 +31,7 @@ export function Transactions() {
         (t.id.toLowerCase().includes(search.toLowerCase()) || t.ledger_entry_id.toLowerCase().includes(search.toLowerCase())) &&
         (t.transaction_timestamp >= from && t.transaction_timestamp <= to)
       )
-      .sort((a, b) => b.transaction_timestamp - a.transaction_timestamp) || [];
+      .sort((a, b) => b.transaction_timestamp - a.timestamp) || [];
   }, [transactions, search, dateFrom, dateTo]);
   const totalPages = Math.ceil(filteredTransactions.length / PAGE_SIZE);
   const paginatedTransactions = filteredTransactions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -45,8 +45,8 @@ export function Transactions() {
       return [
         t.id,
         format(new Date(t.transaction_timestamp), 'yyyy-MM-dd HH:mm:ss'),
-        supplier?.name || 'N/A',
-        ledgerEntry?.material_type || 'N/A',
+        `"${supplier?.name || 'N/A'}"`,
+        `"${ledgerEntry?.material_type || 'N/A'}"`,
         ledgerEntry?.weight_kg.toFixed(2) || 'N/A',
         t.amount.toFixed(2),
         t.epr_fee.toFixed(2)
@@ -64,28 +64,28 @@ export function Transactions() {
   return (
     <PageLayout>
       <div className="space-y-8">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
-          <Button onClick={exportToCSV} disabled={!filteredTransactions || filteredTransactions.length === 0}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+          <Button onClick={exportToCSV} disabled={!filteredTransactions || filteredTransactions.length === 0} className="w-full sm:w-auto h-14"><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
         </div>
         <Card>
           <CardHeader>
-            <div className="flex flex-wrap gap-2">
-              <Input placeholder="Search by ID..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
-              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full sm:w-auto" />
-              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full sm:w-auto" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:flex">
+              <Input placeholder="Search by ID..." value={search} onChange={e => setSearch(e.target.value)} className="sm:max-w-xs h-14" />
+              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full sm:w-auto h-14" />
+              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full sm:w-auto h-14" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg overflow-x-auto">
-              <Table>
+            <div className="overflow-x-auto border rounded-lg">
+              <Table className="min-w-[600px]">
                 <TableHeader><TableRow><TableHead>Transaction ID</TableHead><TableHead>Ledger Entry ID</TableHead><TableHead>Timestamp</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-right">EPR Fee</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {isLoadingTransactions ? (Array.from({ length: 5 }).map((_, i) => (<TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>)))
                    : paginatedTransactions.length > 0 ? (paginatedTransactions.map(t => (
                       <TableRow key={t.id}>
-                        <TableCell className="font-mono text-xs">{t.id}</TableCell>
-                        <TableCell className="font-mono text-xs">{t.ledger_entry_id}</TableCell>
+                        <TableCell className="font-mono text-xs truncate">{t.id}</TableCell>
+                        <TableCell className="font-mono text-xs truncate">{t.ledger_entry_id}</TableCell>
                         <TableCell>{format(new Date(t.transaction_timestamp), 'PPpp')}</TableCell>
                         <TableCell className="text-right font-mono">{t.amount.toFixed(2)} {t.currency}</TableCell>
                         <TableCell className="text-right font-mono">{t.epr_fee.toFixed(2)}</TableCell>
