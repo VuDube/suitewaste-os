@@ -47,10 +47,7 @@ const router = createBrowserRouter([
 ]);
 // PWA Service Worker Registration
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  import('workbox-window').then(({ Workbox }) => {
-    const wb = new Workbox('/sw.js');
-    wb.register();
-  });
+  navigator.serviceWorker.register('/sw.js');
 }
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
