@@ -13,11 +13,11 @@ import { PlusCircle, Trash2, Search, Loader2, ShieldAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { PageLayout } from "@/components/PageLayout";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuthStore } from "@/stores/useAuthStore";
 type SupplierFormData = Omit<Supplier, 'id' | 'created_at' | 'updated_at'>;
 const PAGE_SIZE = 10;
 export function SupplierDirectory() {
-  const { user } = useAuth();
+  const user = useAuthStore(s => s.user);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [isDialogOpen, setDialogOpen] = useState(false);

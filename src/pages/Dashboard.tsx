@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api-client';
-import { useAuth } from '@/hooks/useAuth';
+
 import { PageLayout } from '@/components/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,6 +13,7 @@ import { ArrowRight, BarChart, Bell, BookOpen, Cable, Camera, Users, Weight, Pie
 import { format } from 'date-fns';
 import type { InventoryLedgerEntry, Supplier, Transaction } from '@shared/types';
 import { useOfflineStore } from '@/stores/useOfflineStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 const KpiCard = ({ title, value, icon: Icon, isLoading }: { title: string; value: string | number; icon: React.ElementType; isLoading: boolean }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -45,7 +46,7 @@ const RecentActivityTable = ({ title, data, columns, isLoading, viewAllLink }: {
   </Card>
 );
 export function Dashboard() {
-  const { user } = useAuth();
+  const user = useAuthStore(s => s.user);
   const totalPending = useOfflineStore(s => s.totalPending());
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['dashboard'],

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/useAuth';
+
 import { useAuthStore } from '@/stores/useAuthStore';
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: Array<string>;
@@ -43,7 +43,7 @@ function usePWAInstall() {
 export function GlobalNav() {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { installPrompt, handleInstall } = usePWAInstall();
-  const { user } = useAuth();
+  const user = useAuthStore(s => s.user);
   const logout = useAuthStore(s => s.logout);
   const navigate = useNavigate();
   const handleLogout = () => {

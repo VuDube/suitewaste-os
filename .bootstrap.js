@@ -80,7 +80,8 @@ function runSetupCommands() {
     const commands = [
     "bun add idb-keyval@^6.2.2",
     "bun add localforage@^1.10.0",
-    "bun add workbox-window@^7.1.0"
+    "bun add workbox-window@^7.1.0",
+    "bun add workbox-window"
 ];
     
     if (commands.length === 0) {
