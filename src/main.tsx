@@ -18,6 +18,7 @@ import { InventoryLedger } from '@/pages/InventoryLedger';
 import { Transactions } from '@/pages/Transactions';
 import { HardwareIntegrations } from '@/pages/HardwareIntegrations';
 import { Login } from '@/pages/Login';
+import { Settings } from '@/pages/Settings';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -42,6 +43,7 @@ const router = createBrowserRouter([
   { path: "/ledger", element: <InventoryLedger />, errorElement: <RouteErrorBoundary /> },
   { path: "/transactions", element: <Transactions />, errorElement: <RouteErrorBoundary /> },
   { path: "/hardware", element: <HardwareIntegrations />, errorElement: <RouteErrorBoundary /> },
+  { path: "/settings", element: <Settings />, errorElement: <RouteErrorBoundary /> },
 ]);
 // PWA Service Worker Registration
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

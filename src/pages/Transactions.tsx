@@ -12,6 +12,16 @@ import { format } from 'date-fns';
 import { Download } from 'lucide-react';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 const PAGE_SIZE = 10;
+// Helper to map material types to EPR streams for mock reporting
+const getEprStream = (materialType: string): string => {
+  const lowerMat = materialType.toLowerCase();
+  if (lowerMat.includes('plastic') || lowerMat.includes('pet')) return 'Plastic';
+  if (lowerMat.includes('paper') || lowerMat.includes('cardboard')) return 'Paper & Packaging';
+  if (lowerMat.includes('glass')) return 'Glass';
+  if (lowerMat.includes('copper') || lowerMat.includes('aluminum') || lowerMat.includes('steel') || lowerMat.includes('metal')) return 'Metals';
+  if (lowerMat.includes('electronic') || lowerMat.includes('weee') || lowerMat.includes('battery')) return 'Electrical & Electronic';
+  return 'Other';
+};
 export function Transactions() {
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -31,25 +41,27 @@ export function Transactions() {
         (t.id.toLowerCase().includes(search.toLowerCase()) || t.ledger_entry_id.toLowerCase().includes(search.toLowerCase())) &&
         (t.transaction_timestamp >= from && t.transaction_timestamp <= to)
       )
-      .sort((a, b) => b.transaction_timestamp - a.timestamp) || [];
+      .sort((a, b) => b.transaction_timestamp - a.transaction_timestamp) || [];
   }, [transactions, search, dateFrom, dateTo]);
   const totalPages = Math.ceil(filteredTransactions.length / PAGE_SIZE);
   const paginatedTransactions = filteredTransactions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const exportToCSV = () => {
     const ledgerMap = new Map(ledgerEntries?.map(e => [e.id, e]));
     const supplierMap = new Map(suppliers?.map(s => [s.id, s]));
-    const headers = ['Transaction ID', 'Timestamp', 'Supplier', 'Material', 'Weight (kg)', 'Amount (ZAR)', 'EPR Fee (ZAR)'];
+    const headers = ['Transaction ID', 'Timestamp', 'Supplier', 'Material', 'Weight (kg)', 'Amount (ZAR)', 'EPR Fee (ZAR)', 'EPR Stream'];
     const rows = filteredTransactions.map(t => {
       const ledgerEntry = ledgerMap.get(t.ledger_entry_id);
       const supplier = ledgerEntry ? supplierMap.get(ledgerEntry.supplier_id) : undefined;
+      const materialType = ledgerEntry?.material_type || 'N/A';
       return [
         t.id,
         format(new Date(t.transaction_timestamp), 'yyyy-MM-dd HH:mm:ss'),
         `"${supplier?.name || 'N/A'}"`,
-        `"${ledgerEntry?.material_type || 'N/A'}"`,
+        `"${materialType}"`,
         ledgerEntry?.weight_kg.toFixed(2) || 'N/A',
         t.amount.toFixed(2),
-        t.epr_fee.toFixed(2)
+        t.epr_fee.toFixed(2),
+        getEprStream(materialType)
       ].join(',');
     });
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');

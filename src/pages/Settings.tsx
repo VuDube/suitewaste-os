@@ -1,165 +1,165 @@
-import React, { useState, memo } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '@/components/PageLayout';
 import { api } from '@/lib/api-client';
+import type { User, EPRReport, ConfigUserUpdate } from '@shared/types';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { ShieldAlert, Download, Loader2, Database, Briefcase } from 'lucide-react';
+import { ShieldAlert, Download, Save, Loader2, PieChart as PieChartIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { Link, useNavigate } from 'react-router-dom';
-const DataGovernanceTab = memo(() => {
-  const logout = useAuthStore(s => s.logout);
-  const navigate = useNavigate();
-  const [purgeConfirm, setPurgeConfirm] = useState('');
-  const [isPurging, setIsPurging] = useState(false);
-  const exportMutation = useMutation({
-    mutationFn: () => api<any>('/api/auth/export'),
-    onSuccess: (data) => {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `suitewaste_export_${Date.now()}.json`;
-      link.click();
-      toast.success("Industrial export finalized.");
-    }
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
+const COLORS = ['#38761d', '#5a9a47', '#7cb870', '#a0d69a', '#c5f4c3', '#e7f9e6'];
+function UserRolesTable() {
+  const queryClient = useQueryClient();
+  const { data: users, isLoading } = useQuery({
+    queryKey: ['config-users'],
+    queryFn: () => api<Omit<User, 'password_hash'>[]>('/api/config/users'),
   });
-  const purgeMutation = useMutation({
-    mutationFn: () => api('/api/auth/purge', { method: 'POST' }),
+  const [userChanges, setUserChanges] = useState<Map<string, ConfigUserUpdate>>(new Map());
+  const mutation = useMutation({
+    mutationFn: (updates: ConfigUserUpdate[]) => api('/api/config/users', {
+      method: 'POST',
+      body: JSON.stringify(updates),
+    }),
     onSuccess: () => {
-      toast.success("Account successfully purged.");
-      logout();
-      navigate('/login');
-    }
+      toast.success('User configurations saved successfully!');
+      setUserChanges(new Map());
+      queryClient.invalidateQueries({ queryKey: ['config-users'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save changes', { description: error.message });
+    },
   });
-  const handlePurge = () => {
-    if (purgeConfirm !== 'CONFIRM PURGE') return;
-    setIsPurging(true);
-    setTimeout(() => purgeMutation.mutate(), 2000);
+  const handleRoleChange = (userId: string, role: User['role']) => {
+    setUserChanges(prev => new Map(prev).set(userId, { ...prev.get(userId), id: userId, role }));
+  };
+  const handleActiveChange = (userId: string, active: boolean) => {
+    setUserChanges(prev => new Map(prev).set(userId, { ...prev.get(userId), id: userId, active }));
+  };
+  const handleSaveChanges = () => {
+    mutation.mutate(Array.from(userChanges.values()));
   };
   return (
-    <div className="space-y-6">
-      <Card className="bg-card/80 border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-black uppercase tracking-tighter">
-            <Database className="h-5 w-5 text-primary" /> Data Governance
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          <div className="flex flex-col md:flex-row items-start justify-between gap-6 p-6 rounded-2xl border bg-accent/5">
-            <div className="space-y-1">
-              <h3 className="font-bold text-lg">Personal Data Portability</h3>
-              <p className="text-sm text-muted-foreground">Download a complete JSON record of your profile and history.</p>
-            </div>
-            <Button 
-              onClick={() => exportMutation.mutate()} 
-              disabled={exportMutation.isPending} 
-              variant="outline" 
-              className="h-14 px-8 font-black uppercase tracking-widest w-full md:w-auto touch-haptic"
-            >
-              {exportMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 mr-2" />} Export Package
-            </Button>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>User Role Management</CardTitle>
+        <Button onClick={handleSaveChanges} disabled={userChanges.size === 0 || mutation.isPending}>
+          {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          Save Changes
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto border rounded-lg">
+          <Table>
+            <TableHeader><TableRow><TableHead>Username</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {isLoading ? <TableRow><TableCell colSpan={3} className="text-center">Loading users...</TableCell></TableRow>
+               : users?.map(user => {
+                  const changes = userChanges.get(user.id);
+                  const currentRole = changes?.role ?? user.role;
+                  const currentStatus = changes?.active ?? user.active;
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.username}</TableCell>
+                      <TableCell>
+                        <Select value={currentRole} onValueChange={(role: User['role']) => handleRoleChange(user.id, role)}>
+                          <SelectTrigger className="w-[180px] h-10"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="operator">Operator</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="auditor">Auditor</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Switch checked={currentStatus} onCheckedChange={(active) => handleActiveChange(user.id, active)} />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+function EprReportingTab() {
+  const { data: report, isLoading } = useQuery({
+    queryKey: ['epr-report'],
+    queryFn: () => api<EPRReport>('/api/epr-report'),
+  });
+  const streamData = report ? Object.entries(report.streams).map(([name, data]) => ({ name, ...data })) : [];
+  const handleExportXml = () => {
+    toast.info("PRO XML Export", { description: "This is a mock export. In production, this would download a compliant XML file." });
+  };
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <Card className="lg:col-span-1">
+        <CardHeader><CardTitle>Compliance Overview</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-center">
+            <div className="text-4xl font-bold">{report?.compliance_pct.toFixed(1) ?? '...'}%</div>
+            <p className="text-sm text-muted-foreground">WEEE Compliant Suppliers</p>
           </div>
-          <div className="flex flex-col md:flex-row items-start justify-between gap-6 p-6 rounded-2xl border border-destructive/20 bg-destructive/5">
-            <div className="space-y-4 flex-1">
-              <h3 className="font-bold text-lg text-destructive">Right to Erasure</h3>
-              <p className="text-sm text-muted-foreground mb-4">Permanent deletion of all industrial records associated with this ID.</p>
-              <Input
-                value={purgeConfirm}
-                onChange={e => setPurgeConfirm(e.target.value)}
-                placeholder="Type CONFIRM PURGE"
-                className="max-w-xs border-destructive/30 h-12 rounded-xl bg-white/5"
-              />
-            </div>
-            <Button 
-              onClick={handlePurge} 
-              disabled={purgeConfirm !== 'CONFIRM PURGE' || isPurging} 
-              variant="destructive" 
-              className="h-14 px-8 font-black uppercase tracking-widest w-full md:w-auto touch-haptic"
-            >
-              {isPurging ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Purge Account"}
-            </Button>
+          <div className="text-center">
+            <div className="text-4xl font-bold">R {report?.total_fees.toFixed(2) ?? '...'}</div>
+            <p className="text-sm text-muted-foreground">Total EPR Fees Collected</p>
           </div>
+          <Button onClick={handleExportXml} className="w-full h-14"><Download className="mr-2 h-4 w-4" /> Export PRO XML</Button>
+        </CardContent>
+      </Card>
+      <Card className="lg:col-span-2">
+        <CardHeader><CardTitle>Weight by EPR Stream (kg)</CardTitle></CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie data={streamData} dataKey="weight" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                {streamData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
     </div>
   );
-});
+}
 export function Settings() {
-  const userRole = useAuthStore(s => s.user?.role);
-  const { data: eprReport, isLoading: isLoadingEpr } = useQuery({
-    queryKey: ['epr-report'],
-    queryFn: () => api<any>('/api/epr-report'),
-    enabled: userRole === 'admin'
-  });
-  if (userRole !== 'admin') {
+  const user = useAuthStore(s => s.user);
+  if (user?.role !== 'admin') {
     return (
       <PageLayout>
-        <div className="max-w-2xl mx-auto flex flex-col items-center justify-center py-20 text-center space-y-6">
-          <ShieldAlert className="h-20 w-20 text-destructive" />
-          <h2 className="text-3xl font-black uppercase tracking-tighter text-white">Admin Access Only</h2>
-          <p className="text-muted-foreground">You do not have the required clearance to access global OS settings.</p>
-          <Button asChild variant="outline" className="h-12 rounded-xl font-bold touch-haptic">
-            <Link to="/">Return to Dashboard</Link>
-          </Button>
-        </div>
+        <Alert variant="destructive" className="max-w-2xl mx-auto">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>You do not have the required permissions to access the settings page.</AlertDescription>
+        </Alert>
       </PageLayout>
     );
   }
   return (
     <PageLayout>
-      <div className="space-y-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 lg:py-12">
-        <header>
-          <h1 className="text-5xl font-black uppercase tracking-tighter text-white">Settings</h1>
-          <p className="text-muted-foreground text-lg italic mt-2">Industrial System Configuration</p>
-        </header>
-        <Tabs defaultValue="privacy" className="space-y-8">
-          <TabsList className="bg-surface-variant/50 p-1.5 rounded-2xl h-16 flex gap-2">
-            <TabsTrigger value="privacy" className="flex-1 h-full rounded-xl font-black uppercase tracking-widest text-xs">Governance</TabsTrigger>
-            <TabsTrigger value="roles" className="flex-1 h-full rounded-xl font-black uppercase tracking-widest text-xs">Access</TabsTrigger>
-            <TabsTrigger value="epr" className="flex-1 h-full rounded-xl font-black uppercase tracking-widest text-xs">Regulatory</TabsTrigger>
+      <div className="space-y-8">
+        <h1 className="text-3xl font-bold tracking-tight">System Settings</h1>
+        <Tabs defaultValue="roles" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
+            <TabsTrigger value="roles">Role Configuration</TabsTrigger>
+            <TabsTrigger value="epr">EPR Reporting</TabsTrigger>
           </TabsList>
-          <TabsContent value="privacy" className="animate-fade-in">
-            <DataGovernanceTab />
+          <TabsContent value="roles" className="mt-6">
+            <UserRolesTable />
           </TabsContent>
-          <TabsContent value="roles" className="text-center py-20 animate-fade-in">
-            <Briefcase className="h-16 w-16 mx-auto mb-6 text-primary/40" />
-            <h3 className="text-2xl font-black uppercase tracking-tighter text-white">Role Management</h3>
-            <p className="text-muted-foreground max-w-md mx-auto mb-8 mt-2">Manage personnel clearance levels and feature gating through the Staff Hub.</p>
-            <Button asChild className="h-14 px-10 font-black uppercase tracking-widest touch-haptic">
-              <Link to="/staff">Open Staff Hub</Link>
-            </Button>
-          </TabsContent>
-          <TabsContent value="epr" className="animate-fade-in">
-            <Card className="glass-panel border-none p-12 text-center space-y-6 rounded-3xl shadow-elevation-12">
-              {isLoadingEpr ? (
-                <div className="flex flex-col items-center gap-4">
-                  <Loader2 className="h-10 w-10 animate-spin text-leaf" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-leaf">Aggregating Compliance Data...</p>
-                </div>
-              ) : (
-                <>
-                  <Badge className="bg-leaf/20 text-leaf border-none font-black uppercase text-[10px] tracking-widest px-4 py-1.5 mx-auto">
-                    EPR Compliant Node
-                  </Badge>
-                  <div className="text-6xl font-black tracking-tighter text-white">
-                    R {(eprReport?.total_fees || 124500).toLocaleString()}
-                  </div>
-                  <p className="text-muted-foreground font-medium max-w-sm mx-auto">
-                    Current accumulated compliance fees for the H2-2025 period. All transactions verified by SHA256 audit chain.
-                  </p>
-                  <div className="pt-4">
-                    <Button variant="outline" className="h-12 px-8 font-black uppercase tracking-widest touch-haptic border-white/10">
-                      View Detailed Audit
-                    </Button>
-                  </div>
-                </>
-              )}
-            </Card>
+          <TabsContent value="epr" className="mt-6">
+            <EprReportingTab />
           </TabsContent>
         </Tabs>
       </div>

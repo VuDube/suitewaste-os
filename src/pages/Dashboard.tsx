@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api-client';
-
 import { PageLayout } from '@/components/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowRight, BarChart, Bell, BookOpen, Cable, Camera, Users, Weight, PieChart as PieChartIcon } from 'lucide-react';
+import { ArrowRight, BarChart, Bell, BookOpen, Cable, Camera, Users, Weight, PieChart as PieChartIcon, Settings } from 'lucide-react';
 import { format } from 'date-fns';
-import type { InventoryLedgerEntry, Supplier, Transaction } from '@shared/types';
+import type { InventoryLedgerEntry, Supplier, Transaction, EPRReport } from '@shared/types';
 import { useOfflineStore } from '@/stores/useOfflineStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 const KpiCard = ({ title, value, icon: Icon, isLoading }: { title: string; value: string | number; icon: React.ElementType; isLoading: boolean }) => (
@@ -47,15 +46,19 @@ const RecentActivityTable = ({ title, data, columns, isLoading, viewAllLink }: {
 );
 const DashboardContent = () => {
   const user = useAuthStore(s => s.user);
-  const { data: dashboardData, isLoading } = useQuery({
+  const { data: dashboardData, isLoading: isLoadingDashboard } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api<any>('/api/dashboard'),
     enabled: !!user,
   });
+  const { data: eprData, isLoading: isLoadingEpr } = useQuery({
+    queryKey: ['epr-report'],
+    queryFn: () => api<EPRReport>('/api/epr-report'),
+    enabled: !!user && (user.role === 'admin' || user.role === 'auditor'),
+  });
   const summary = dashboardData?.summary || {};
-
+  const isLoading = isLoadingDashboard || (user && ['admin', 'auditor'].includes(user.role) && isLoadingEpr);
   if (!user) return null;
-
   switch (user.role) {
     case 'operator':
       return (
@@ -83,18 +86,8 @@ const DashboardContent = () => {
           <Card>
             <CardHeader><CardTitle>Hardware Status</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2"><Cable className="h-5 w-5" /> Serial Scale</span>
-                <Badge variant={dashboardData?.hardwareStatus?.scale === 'connected' ? 'default' : 'destructive'} className="bg-green-600">
-                  {dashboardData?.hardwareStatus?.scale}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2"><Camera className="h-5 w-5" /> IP Camera</span>
-                <Badge variant={dashboardData?.hardwareStatus?.camera === 'healthy' ? 'default' : 'destructive'} className="bg-green-600">
-                  {dashboardData?.hardwareStatus?.camera}
-                </Badge>
-              </div>
+              <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Cable className="h-5 w-5" /> Serial Scale</span><Badge variant={dashboardData?.hardwareStatus?.scale === 'connected' ? 'default' : 'destructive'} className="bg-green-600">{dashboardData?.hardwareStatus?.scale}</Badge></div>
+              <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Camera className="h-5 w-5" /> IP Camera</span><Badge variant={dashboardData?.hardwareStatus?.camera === 'healthy' ? 'default' : 'destructive'} className="bg-green-600">{dashboardData?.hardwareStatus?.camera}</Badge></div>
             </CardContent>
           </Card>
         </div>
@@ -106,17 +99,7 @@ const DashboardContent = () => {
           <KpiCard title="Total Value (ZAR)" value={`R ${summary.totalValue?.toFixed(2) || 0}`} icon={BarChart} isLoading={isLoading} />
           <KpiCard title="Total EPR Fees (ZAR)" value={`R ${summary.totalEPR?.toFixed(2) || 0}`} icon={BookOpen} isLoading={isLoading} />
           <KpiCard title="Recent Suppliers" value={summary.recentSuppliers?.length || 0} icon={Users} isLoading={isLoading} />
-          <RecentActivityTable
-            title="Recent Ledger Entries"
-            data={summary.recentLedger || []}
-            isLoading={isLoading}
-            viewAllLink="/ledger"
-            columns={[
-              { header: 'Material', accessor: (l: InventoryLedgerEntry) => l.material_type },
-              { header: 'Weight (kg)', accessor: (l: InventoryLedgerEntry) => l.weight_kg.toFixed(2) },
-              { header: 'Date', accessor: (l: InventoryLedgerEntry) => format(new Date(l.capture_timestamp), 'PP') },
-            ]}
-          />
+          <RecentActivityTable title="Recent Ledger Entries" data={summary.recentLedger || []} isLoading={isLoading} viewAllLink="/ledger" columns={[{ header: 'Material', accessor: (l: InventoryLedgerEntry) => l.material_type }, { header: 'Weight (kg)', accessor: (l: InventoryLedgerEntry) => l.weight_kg.toFixed(2) }, { header: 'Date', accessor: (l: InventoryLedgerEntry) => format(new Date(l.capture_timestamp), 'PP') }]} />
         </div>
       );
     case 'admin':
@@ -124,49 +107,31 @@ const DashboardContent = () => {
         <div className="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-4">
           <KpiCard title="Total Weight (kg)" value={summary.totalWeight?.toFixed(2) || 0} icon={Weight} isLoading={isLoading} />
           <KpiCard title="Total Value (ZAR)" value={`R ${summary.totalValue?.toFixed(2) || 0}`} icon={BarChart} isLoading={isLoading} />
-          <KpiCard title="WEEE Compliance" value={`${summary.weeePct?.toFixed(1) || 0}%`} icon={PieChartIcon} isLoading={isLoading} />
+          <KpiCard title="EPR Compliance" value={`${eprData?.compliance_pct.toFixed(1) || 0}%`} icon={PieChartIcon} isLoading={isLoading} />
           <KpiCard title="Active Users" value={summary.userCount || 0} icon={Users} isLoading={isLoading} />
-          <RecentActivityTable
-            title="Recent Suppliers"
-            data={summary.recentSuppliers || []}
-            isLoading={isLoading}
-            viewAllLink="/suppliers"
-            columns={[
-              { header: 'Name', accessor: (s: Supplier) => s.name },
-              { header: 'EPR Number', accessor: (s: Supplier) => s.epr_number || 'N/A' },
-              { header: 'WEEE', accessor: (s: Supplier) => s.is_weee_compliant ? 'Yes' : 'No' },
-            ]}
-          />
+          <RecentActivityTable title="Recent Suppliers" data={summary.recentSuppliers || []} isLoading={isLoading} viewAllLink="/suppliers" columns={[{ header: 'Name', accessor: (s: Supplier) => s.name }, { header: 'EPR Number', accessor: (s: Supplier) => s.epr_number || 'N/A' }, { header: 'WEEE', accessor: (s: Supplier) => s.is_weee_compliant ? 'Yes' : 'No' }]} />
+          <Card className="col-span-1 lg:col-span-2 bg-secondary/50">
+            <CardHeader><CardTitle>Admin Tools</CardTitle></CardHeader>
+            <CardContent><Button asChild className="w-full h-14 text-lg"><Link to="/settings"><Settings className="mr-2 h-5 w-5" /> Go to Settings</Link></Button></CardContent>
+          </Card>
         </div>
       );
     case 'auditor':
       return (
         <div className="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3">
           <KpiCard title="Total Weight Audited (kg)" value={summary.totalWeight?.toFixed(2) || 0} icon={Weight} isLoading={isLoading} />
-          <KpiCard title="Total EPR Fees (ZAR)" value={`R ${summary.totalEPR?.toFixed(2) || 0}`} icon={BookOpen} isLoading={isLoading} />
-          <KpiCard title="WEEE Compliance" value={`${summary.weeePct?.toFixed(1) || 0}%`} icon={PieChartIcon} isLoading={isLoading} />
-          <RecentActivityTable
-            title="Recent Ledger Entries"
-            data={summary.recentLedger || []}
-            isLoading={isLoading}
-            viewAllLink="/ledger"
-            columns={[
-              { header: 'Material', accessor: (l: InventoryLedgerEntry) => l.material_type },
-              { header: 'Weight (kg)', accessor: (l: InventoryLedgerEntry) => l.weight_kg.toFixed(2) },
-              { header: 'Date', accessor: (l: InventoryLedgerEntry) => format(new Date(l.capture_timestamp), 'PP') },
-            ]}
-          />
+          <KpiCard title="Total EPR Fees (ZAR)" value={`R ${eprData?.total_fees.toFixed(2) || 0}`} icon={BookOpen} isLoading={isLoading} />
+          <KpiCard title="WEEE Compliance" value={`${eprData?.compliance_pct.toFixed(1) || 0}%`} icon={PieChartIcon} isLoading={isLoading} />
+          <RecentActivityTable title="Recent Ledger Entries" data={summary.recentLedger || []} isLoading={isLoading} viewAllLink="/ledger" columns={[{ header: 'Material', accessor: (l: InventoryLedgerEntry) => l.material_type }, { header: 'Weight (kg)', accessor: (l: InventoryLedgerEntry) => l.weight_kg.toFixed(2) }, { header: 'Date', accessor: (l: InventoryLedgerEntry) => format(new Date(l.capture_timestamp), 'PP') }]} />
         </div>
       );
     default:
       return <p>No dashboard view available for your role.</p>;
   }
 };
-
 export function Dashboard() {
   const user = useAuthStore(s => s.user);
   const totalPending = useOfflineStore(s => s.totalPending());
-
   return (
     <PageLayout>
       <div className="space-y-6">

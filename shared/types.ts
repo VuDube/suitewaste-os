@@ -50,3 +50,17 @@ export interface Transaction {
   is_synced: boolean;
   created_at: number; // epoch millis
 }
+// --- Admin & Reporting Types ---
+export interface EPRStreamData {
+  weight: number;
+  fees: number;
+}
+export interface EPRReport {
+  compliance_pct: number;
+  total_fees: number;
+  pro_xml_mock_hash?: string; // Mock R2 key for a PRO XML certificate
+  streams: {
+    [stream: string]: EPRStreamData;
+  };
+}
+export type ConfigUserUpdate = Pick<User, 'id' | 'role' | 'active'>;
