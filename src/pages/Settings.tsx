@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '@/components/PageLayout';
 import { api } from '@/lib/api-client';
@@ -38,9 +38,16 @@ function UserRolesTable() {
     },
   });
   const handleFieldChange = (userId: string, field: keyof ConfigUserUpdate, value: any) => {
+    const user = users?.find(u => u.id === userId);
+    if (!user) return;
     setUserChanges(prev => {
       const newChanges = new Map(prev);
-      const currentUserChanges = newChanges.get(userId) || { id: userId };
+      const currentUserChanges = newChanges.get(userId) || { 
+        id: userId, 
+        role: user.role, 
+        active: user.active, 
+        features: user.features || [] 
+      };
       (currentUserChanges as any)[field] = value;
       newChanges.set(userId, currentUserChanges);
       return newChanges;
@@ -50,13 +57,13 @@ function UserRolesTable() {
     mutation.mutate(Array.from(userChanges.values()));
   };
   return (
-    <Card>
+    <Card className="backdrop-blur-xl shadow-glow hover:shadow-primary/30 transition-all duration-300">
       <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <CardTitle>User Role Management</CardTitle>
           <p className="text-sm text-muted-foreground">Configure roles, status, and feature access for each user.</p>
         </div>
-        <Button onClick={handleSaveChanges} disabled={userChanges.size === 0 || mutation.isPending} className="w-full md:w-auto h-12">
+        <Button onClick={handleSaveChanges} disabled={userChanges.size === 0 || mutation.isPending} className="w-full md:w-auto h-12 shadow-primary hover:shadow-glow-lg transition-shadow">
           {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Save Changes
         </Button>
@@ -87,7 +94,7 @@ function UserRolesTable() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Switch checked={currentStatus} onCheckedChange={(active) => handleFieldChange(user.id, 'active', active)} />
+                        <Switch checked={currentStatus} onCheckedChange={(active: boolean) => handleFieldChange(user.id, 'active', active)} />
                       </TableCell>
                       <TableCell>
                         <Input
@@ -114,11 +121,30 @@ function EprReportingTab() {
   });
   const streamData = report ? Object.entries(report.streams).map(([name, data]) => ({ name, ...data })) : [];
   const handleExportXml = () => {
-    toast.info("PRO XML Export", { description: "This is a mock export. In production, this would download a compliant XML file." });
+    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<EPRReport date="${new Date().toISOString()}">
+  <Summary>
+    <CompliancePercentage>${report?.compliance_pct.toFixed(2)}</CompliancePercentage>
+    <TotalFees>${report?.total_fees.toFixed(2)}</TotalFees>
+  </Summary>
+  <Streams>
+    ${streamData.map(s => `<Stream name="${s.name}"><WeightKg>${s.weight}</WeightKg><FeesZAR>${s.fees}</FeesZAR></Stream>`).join('\n    ')}
+  </Streams>
+</EPRReport>`;
+    const blob = new Blob([xmlContent], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'epr-report.xml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.info("PRO XML Export", { description: "A mock EPR report has been downloaded." });
   };
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <Card className="lg:col-span-1">
+      <Card className="lg:col-span-1 backdrop-blur-xl shadow-glow hover:shadow-primary/30 transition-all duration-300">
         <CardHeader><CardTitle>Compliance Overview</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="text-center">
@@ -132,19 +158,21 @@ function EprReportingTab() {
           <Button onClick={handleExportXml} className="w-full h-14"><Download className="mr-2 h-4 w-4" /> Export PRO XML</Button>
         </CardContent>
       </Card>
-      <Card className="lg:col-span-2">
+      <Card className="lg:col-span-2 backdrop-blur-xl shadow-glow hover:shadow-primary/30 transition-all duration-300">
         <CardHeader><CardTitle>Weight by EPR Stream (kg)</CardTitle></CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            {isLoading ? <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div> :
-            <PieChart>
-              <Pie data={streamData} dataKey="weight" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                {streamData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>}
-          </ResponsiveContainer>
+          <Suspense fallback={<Loader2 className="animate-spin h-8 w-8 mx-auto" />}>
+            <ResponsiveContainer width="100%" height={300}>
+              {isLoading ? <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div> :
+              <PieChart>
+                <Pie data={streamData} dataKey="weight" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                  {streamData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>}
+            </ResponsiveContainer>
+          </Suspense>
         </CardContent>
       </Card>
     </div>
@@ -172,10 +200,10 @@ export function Settings() {
             <TabsTrigger value="roles">Role Configuration</TabsTrigger>
             <TabsTrigger value="epr">EPR Reporting</TabsTrigger>
           </TabsList>
-          <TabsContent value="roles" className="mt-6">
+          <TabsContent value="roles" className="mt-6 animate-fade-in">
             <UserRolesTable />
           </TabsContent>
-          <TabsContent value="epr" className="mt-6">
+          <TabsContent value="epr" className="mt-6 animate-fade-in">
             <EprReportingTab />
           </TabsContent>
         </Tabs>

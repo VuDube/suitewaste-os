@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,23 @@ import type { Supplier } from "@shared/types";
 import { v4 as uuid } from 'uuid';
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+const WeightDisplay = memo(({ weight, status }: { weight: number, status: string }) => (
+  <div className="relative w-full text-center mb-6">
+    <span
+      className={cn(
+        "font-mono font-bold tabular-nums transition-all duration-500",
+        "text-[clamp(5rem,20vw,12rem)] sm:text-[clamp(6rem,25vw,14rem)]",
+        status === 'connected' || status === 'parsing' 
+          ? "bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent animate-pulse" 
+          : "text-muted-foreground/50"
+      )}
+    >
+      {weight.toFixed(2)}
+    </span>
+    <span className="absolute bottom-1 right-0 text-2xl md:text-4xl font-medium text-muted-foreground">kg</span>
+  </div>
+));
 export function QuickWeightPOS() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -100,7 +117,7 @@ export function QuickWeightPOS() {
     <div className="h-dvh w-full flex flex-col overflow-hidden bg-background text-foreground">
       <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 p-4 md:p-6 lg:p-8 overflow-y-auto">
         <div className="md:col-span-2 flex flex-col">
-          <Card className="bg-card/80 border-border backdrop-blur-sm shadow-2xl shadow-black/50 flex-1 flex flex-col">
+          <Card className="bg-card/80 border-border backdrop-blur-xl shadow-glow shadow-primary/40 hover:shadow-primary/60 transition-shadow flex-1 flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-lg font-medium text-muted-foreground">Live Weight</CardTitle>
               <div className="flex items-center gap-2 text-sm capitalize text-muted-foreground">
@@ -109,22 +126,11 @@ export function QuickWeightPOS() {
               </div>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col items-center justify-center p-6">
-              <div className="relative w-full text-center mb-6">
-                <span
-                  className={cn(
-                    "font-mono font-bold tabular-nums transition-colors duration-300",
-                    "text-[clamp(5rem,20vw,12rem)] sm:text-[clamp(6rem,25vw,14rem)]",
-                    status === 'connected' || status === 'parsing' ? "text-foreground" : "text-muted-foreground/50"
-                  )}
-                >
-                  {weight.toFixed(2)}
-                </span>
-                <span className="absolute bottom-1 right-0 text-2xl md:text-4xl font-medium text-muted-foreground">kg</span>
-              </div>
+              <WeightDisplay weight={weight} status={status} />
               <div className="w-full flex flex-col sm:flex-row gap-4">
                 <Button
                   size="lg"
-                  className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 h-14 text-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-ring shadow-lg shadow-primary/20"
+                  className="flex-1 bg-gradient-to-r from-primary to-green-600 hover:from-primary hover:to-emerald-600 text-primary-foreground h-14 text-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-ring shadow-glow-lg shadow-primary/40"
                   onClick={handleCapture}
                   disabled={status !== 'connected' && status !== 'parsing'}
                 >
@@ -145,7 +151,7 @@ export function QuickWeightPOS() {
           </Card>
         </div>
         <div className="md:col-span-1">
-          <Card className="bg-card/80 border-border h-full">
+          <Card className="bg-card/80 border-border backdrop-blur-xl shadow-glow shadow-primary/40 h-full">
             <CardHeader>
               <CardTitle className="text-lg font-medium text-muted-foreground">Transaction Details</CardTitle>
             </CardHeader>
@@ -177,7 +183,8 @@ export function QuickWeightPOS() {
               </div>
               <Button onClick={handleSync} className="w-full h-14 text-lg" disabled={totalPending === 0}>
                 <Send className="mr-2 h-4 w-4" />
-                Sync {totalPending} Pending
+                Sync Pending
+                {totalPending > 0 && <Badge className="ml-2 bg-destructive animate-pulse">{totalPending}</Badge>}
               </Button>
             </CardContent>
           </Card>
