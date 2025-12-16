@@ -7,11 +7,12 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ShieldAlert, Download, Save, Loader2, PieChart as PieChartIcon } from 'lucide-react';
+import { ShieldAlert, Download, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 const COLORS = ['#38761d', '#5a9a47', '#7cb870', '#a0d69a', '#c5f4c3', '#e7f9e6'];
@@ -36,20 +37,26 @@ function UserRolesTable() {
       toast.error('Failed to save changes', { description: error.message });
     },
   });
-  const handleRoleChange = (userId: string, role: User['role']) => {
-    setUserChanges(prev => new Map(prev).set(userId, { ...prev.get(userId), id: userId, role }));
-  };
-  const handleActiveChange = (userId: string, active: boolean) => {
-    setUserChanges(prev => new Map(prev).set(userId, { ...prev.get(userId), id: userId, active }));
+  const handleFieldChange = (userId: string, field: keyof ConfigUserUpdate, value: any) => {
+    setUserChanges(prev => {
+      const newChanges = new Map(prev);
+      const currentUserChanges = newChanges.get(userId) || { id: userId };
+      (currentUserChanges as any)[field] = value;
+      newChanges.set(userId, currentUserChanges);
+      return newChanges;
+    });
   };
   const handleSaveChanges = () => {
     mutation.mutate(Array.from(userChanges.values()));
   };
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>User Role Management</CardTitle>
-        <Button onClick={handleSaveChanges} disabled={userChanges.size === 0 || mutation.isPending}>
+      <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <CardTitle>User Role Management</CardTitle>
+          <p className="text-sm text-muted-foreground">Configure roles, status, and feature access for each user.</p>
+        </div>
+        <Button onClick={handleSaveChanges} disabled={userChanges.size === 0 || mutation.isPending} className="w-full md:w-auto h-12">
           {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Save Changes
         </Button>
@@ -57,19 +64,20 @@ function UserRolesTable() {
       <CardContent>
         <div className="overflow-x-auto border rounded-lg">
           <Table>
-            <TableHeader><TableRow><TableHead>Username</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Username</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead>Features</TableHead></TableRow></TableHeader>
             <TableBody>
-              {isLoading ? <TableRow><TableCell colSpan={3} className="text-center">Loading users...</TableCell></TableRow>
+              {isLoading ? <TableRow><TableCell colSpan={4} className="text-center h-24">Loading users...</TableCell></TableRow>
                : users?.map(user => {
                   const changes = userChanges.get(user.id);
                   const currentRole = changes?.role ?? user.role;
                   const currentStatus = changes?.active ?? user.active;
+                  const currentFeatures = changes?.features ?? user.features ?? [];
                   return (
                     <TableRow key={user.id}>
-                      <TableCell>{user.username}</TableCell>
+                      <TableCell className="font-medium">{user.username}</TableCell>
                       <TableCell>
-                        <Select value={currentRole} onValueChange={(role: User['role']) => handleRoleChange(user.id, role)}>
-                          <SelectTrigger className="w-[180px] h-10"><SelectValue /></SelectTrigger>
+                        <Select value={currentRole} onValueChange={(role: User['role']) => handleFieldChange(user.id, 'role', role)}>
+                          <SelectTrigger className="w-[140px] h-10"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="operator">Operator</SelectItem>
                             <SelectItem value="manager">Manager</SelectItem>
@@ -79,7 +87,15 @@ function UserRolesTable() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Switch checked={currentStatus} onCheckedChange={(active) => handleActiveChange(user.id, active)} />
+                        <Switch checked={currentStatus} onCheckedChange={(active) => handleFieldChange(user.id, 'active', active)} />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="chat-access,fleet..."
+                          value={currentFeatures.join(',')}
+                          onChange={e => handleFieldChange(user.id, 'features', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                          className="h-10 w-full md:w-64"
+                        />
                       </TableCell>
                     </TableRow>
                   );
@@ -106,11 +122,11 @@ function EprReportingTab() {
         <CardHeader><CardTitle>Compliance Overview</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="text-center">
-            <div className="text-4xl font-bold">{report?.compliance_pct.toFixed(1) ?? '...'}%</div>
+            <div className="text-4xl font-bold">{isLoading ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : `${report?.compliance_pct.toFixed(1)}%`}</div>
             <p className="text-sm text-muted-foreground">WEEE Compliant Suppliers</p>
           </div>
           <div className="text-center">
-            <div className="text-4xl font-bold">R {report?.total_fees.toFixed(2) ?? '...'}</div>
+            <div className="text-4xl font-bold">{isLoading ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : `R ${report?.total_fees.toFixed(2)}`}</div>
             <p className="text-sm text-muted-foreground">Total EPR Fees Collected</p>
           </div>
           <Button onClick={handleExportXml} className="w-full h-14"><Download className="mr-2 h-4 w-4" /> Export PRO XML</Button>
@@ -120,13 +136,14 @@ function EprReportingTab() {
         <CardHeader><CardTitle>Weight by EPR Stream (kg)</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
+            {isLoading ? <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div> :
             <PieChart>
               <Pie data={streamData} dataKey="weight" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
                 {streamData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
               </Pie>
               <Tooltip />
               <Legend />
-            </PieChart>
+            </PieChart>}
           </ResponsiveContainer>
         </CardContent>
       </Card>

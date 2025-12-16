@@ -55,6 +55,7 @@ export class UserEntity extends IndexedEntity<User> {
     password_hash: "",
     role: "operator",
     active: false,
+    features: [],
     created_at: 0,
   };
   static seedData = MOCK_USERS;

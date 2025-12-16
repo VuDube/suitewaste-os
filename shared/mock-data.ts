@@ -7,6 +7,7 @@ export const MOCK_USERS: User[] = [
     password_hash: 'pin123',
     role: 'operator',
     active: true,
+    features: ['chat-access'],
     created_at: Date.now(),
   },
   {
@@ -15,6 +16,7 @@ export const MOCK_USERS: User[] = [
     password_hash: 'pass456',
     role: 'manager',
     active: true,
+    features: ['chat-access'],
     created_at: Date.now(),
   },
   {
@@ -23,6 +25,7 @@ export const MOCK_USERS: User[] = [
     password_hash: 'admin789',
     role: 'admin',
     active: true,
+    features: ['chat-access', 'fleet', 'hr'],
     created_at: Date.now(),
   },
   {
@@ -31,6 +34,7 @@ export const MOCK_USERS: User[] = [
     password_hash: 'audit123',
     role: 'auditor',
     active: true,
+    features: [],
     created_at: Date.now(),
   },
 ];

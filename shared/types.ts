@@ -11,6 +11,7 @@ export interface User {
   password_hash: string;
   role: 'operator' | 'manager' | 'admin' | 'auditor';
   active: boolean;
+  features?: string[];
   created_at: number; // epoch millis
 }
 export interface Supplier {
@@ -63,4 +64,4 @@ export interface EPRReport {
     [stream: string]: EPRStreamData;
   };
 }
-export type ConfigUserUpdate = Pick<User, 'id' | 'role' | 'active'>;
+export type ConfigUserUpdate = Pick<User, 'id' | 'role' | 'active' | 'features'>;

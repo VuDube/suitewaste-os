@@ -7,7 +7,7 @@ import type { InventoryLedgerEntry, Supplier, Transaction, User, ConfigUserUpdat
 import { HTTPException } from "hono/http-exception";
 const unauthorized = () => new HTTPException(401, { message: 'Unauthorized' });
 const forbidden = () => new HTTPException(403, { message: 'Forbidden' });
-type HonoApp = Hono<{ Bindings: Env; Variables: { user: User } }>;
+type HonoApp = Hono<{ Bindings: Env; Variables: { user?: User } }>;
 const getEprStream = (materialType: string): string => {
   const lowerMat = materialType.toLowerCase();
   if (lowerMat.includes('plastic') || lowerMat.includes('pet')) return 'Plastic';
@@ -60,12 +60,14 @@ export function userRoutes(app: HonoApp) {
   });
   app.get('/api/auth/me', async (c) => {
     const user = c.get('user');
+    if (!user) throw unauthorized();
     const { password_hash, ...userWithoutPassword } = user;
     return ok(c, userWithoutPassword);
   });
   // --- DASHBOARD ---
   app.get('/api/dashboard', async (c) => {
     const user = c.get('user');
+    if (!user) throw unauthorized();
     const [suppliersPage, ledgerPage, transactionsPage] = await Promise.all([
       SupplierEntity.list(c.env, null, 500),
       InventoryLedgerEntity.list(c.env, null, 500),
@@ -133,7 +135,8 @@ export function userRoutes(app: HonoApp) {
         await userEntity.mutate(currentUser => ({
           ...currentUser,
           role: update.role,
-          active: update.active,
+          active: update.active ?? currentUser.active,
+          features: update.features ?? currentUser.features ?? [],
         }));
         return { id: update.id, success: true };
       } catch (e) {
