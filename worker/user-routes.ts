@@ -5,9 +5,9 @@ import { SupplierEntity, InventoryLedgerEntity, TransactionEntity, UserEntity } 
 import { ok, bad, notFound } from './core-utils';
 import type { InventoryLedgerEntry, Supplier, Transaction, User, ConfigUserUpdate } from "@shared/types";
 import { HTTPException } from "hono/http-exception";
+import type { HonoApp } from './index';
 const unauthorized = () => new HTTPException(401, { message: 'Unauthorized' });
 const forbidden = () => new HTTPException(403, { message: 'Forbidden' });
-type HonoApp = Hono<{ Bindings: Env; Variables: { user?: User } }>;
 const getEprStream = (materialType: string): string => {
   const lowerMat = materialType.toLowerCase();
   if (lowerMat.includes('plastic') || lowerMat.includes('pet')) return 'Plastic';
@@ -21,7 +21,7 @@ export function userRoutes(app: HonoApp) {
   // --- AUTH MIDDLEWARE ---
   app.use('/api/*', async (c, next) => {
     const path = c.req.path;
-    if (['/api/auth/init', '/api/auth/login', '/api/health'].some(p => path.startsWith(p))) {
+    if (['/api/auth/init', '/api/auth/login', '/api/health', '/api/version'].some(p => path.startsWith(p))) {
       return next();
     }
     const authHeader = c.req.header('Authorization');
@@ -144,6 +144,17 @@ export function userRoutes(app: HonoApp) {
       }
     }));
     return ok(c, results);
+  });
+  // --- MONITORING (Admin) ---
+  app.get('/api/monitor', requireRole(['admin']), async (c) => {
+    // In a real app, you'd check a KV store or DO for actual queue depth.
+    const pendingMock = Math.floor(Math.random() * 10);
+    const userCount = (await UserEntity.list(c.env, null, 1000)).items.length;
+    return ok(c, {
+      queueDepth: pendingMock,
+      syncPending: pendingMock,
+      users: userCount,
+    });
   });
   // --- Standard CRUD Routes ---
   app.get('/api/suppliers', async (c) => { await SupplierEntity.ensureSeed(c.env); return ok(c, (await SupplierEntity.list(c.env, null, 100)).items); });

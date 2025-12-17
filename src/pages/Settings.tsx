@@ -1,4 +1,4 @@
-import React, { useState, Suspense, useMemo } from 'react';
+import React, { useState, Suspense, useMemo, memo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '@/components/PageLayout';
 import { api } from '@/lib/api-client';
@@ -17,8 +17,8 @@ import { toast } from 'sonner';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 const COLORS = ['#38761d', '#5a9a47', '#7cb870', '#a0d69a', '#c5f4c3', '#e7f9e6'];
 // As per DFFE Government Gazette 43956
-const EPR_STREAMS = ['Plastic', 'PaperPackaging', 'Glass', 'Metals', 'ElectricalElectronic', 'Other'];
-function UserRolesTable() {
+const EPR_STREAMS = ['Plastic', 'Paper & Packaging', 'Glass', 'Metals', 'Electrical & Electronic', 'Other'];
+const UserRolesTable = memo(() => {
   const queryClient = useQueryClient();
   const { data: users, isLoading } = useQuery({
     queryKey: ['config-users'],
@@ -115,8 +115,8 @@ function UserRolesTable() {
       </CardContent>
     </Card>
   );
-}
-function EprReportingTab() {
+});
+const EprReportingTab = memo(() => {
   const { data: report, isLoading } = useQuery({
     queryKey: ['epr-report'],
     queryFn: () => api<EPRReport>('/api/epr-report'),
@@ -125,7 +125,7 @@ function EprReportingTab() {
     if (!report) return [];
     const streams = report.streams || {};
     return EPR_STREAMS.map(streamName => ({
-      name: streamName.replace('Packaging', ' Pkg').replace('ElectricalElectronic', 'E&E'),
+      name: streamName,
       weight: streams[streamName]?.weight || 0,
       fees: streams[streamName]?.fees || 0,
     })).filter(s => s.weight > 0);
@@ -133,9 +133,8 @@ function EprReportingTab() {
   const handleExportPdf = async () => {
     if (!report) return;
     toast.info("Generating Audit Report...", { description: "This is a mock PDF generation." });
-    // Mock SHA256 hash chain for tamper evidence
     const encoder = new TextEncoder();
-    let lastHash = '0'.repeat(64); // Genesis hash
+    let lastHash = '0xdeadbeef' + new Date().toISOString();
     const reportItems = streamData.map(s => `${s.name}:${s.weight.toFixed(2)}:${s.fees.toFixed(2)}`);
     for (const item of reportItems) {
         const data = encoder.encode(item + lastHash);
@@ -143,70 +142,47 @@ function EprReportingTab() {
         lastHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
     }
     const pdfContent = `
-      %PDF-1.7
-      %âãÏÓ
-      1 0 obj
-      << /Type /Catalog /Pages 2 0 R >>
-      endobj
-      2 0 obj
-      << /Type /Pages /Kids [3 0 R] /Count 1 >>
-      endobj
-      3 0 obj
-      << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>
-      endobj
-      4 0 obj
-      << /Length 200 >>
-      stream
-      BT
-      /F1 12 Tf
-      72 720 Td
-      (SuiteWaste OS - EPR Audit Report) Tj
-      72 700 Td
-      (Generated: ${new Date().toISOString()}) Tj
-      72 650 Td
-      (Compliance: ${report.compliance_pct.toFixed(2)}%) Tj
-      72 630 Td
-      (Total Fees: ZAR ${report.total_fees.toFixed(2)}) Tj
-      ${streamData.map((s, i) => `72 ${600 - i*20} Td (${s.name}: ${s.weight.toFixed(2)} kg) Tj`).join('\n')}
-      72 100 Td
-      (Audit Hash: ${lastHash}) Tj
-      ET
-      endstream
-      endobj
-      trailer << /Root 1 0 R >>
-      %%EOF
+      SuiteWaste OS - EPR Audit Report
+      Generated: ${new Date().toISOString()}
+      --------------------------------------
+      Compliance: ${report.compliance_pct.toFixed(2)}%
+      Total Fees: ZAR ${report.total_fees.toFixed(2)}
+      Streams:
+      ${streamData.map(s => `- ${s.name}: ${s.weight.toFixed(2)} kg (ZAR ${s.fees.toFixed(2)})`).join('\n')}
+      --------------------------------------
+      Final Audit Chain Hash: ${lastHash}
     `.trim();
-    const blob = new Blob([pdfContent], { type: 'application/pdf' });
+    const blob = new Blob([pdfContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `SuiteWaste_EPR_Audit_${new Date().toISOString().split('T')[0]}.pdf`;
+    a.download = `SuiteWaste_EPR_Audit_${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
       <Card className="lg:col-span-1 backdrop-blur-xl shadow-glow hover:shadow-primary/30 transition-all duration-300">
         <CardHeader><CardTitle>Compliance Overview</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="text-center">
-            <div className="text-[clamp(2rem,8vw,3rem)] font-bold">{isLoading ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : `${report?.compliance_pct.toFixed(1)}%`}</div>
+            <div className="text-[clamp(1.5rem,5vw,3rem)] font-bold">{isLoading ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : `${report?.compliance_pct.toFixed(1)}%`}</div>
             <p className="text-sm text-muted-foreground">WEEE Compliant Suppliers</p>
           </div>
           <div className="text-center">
-            <div className="text-[clamp(2rem,8vw,3rem)] font-bold">{isLoading ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : `R ${report?.total_fees.toFixed(2)}`}</div>
+            <div className="text-[clamp(1.5rem,5vw,3rem)] font-bold">{isLoading ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : `R ${report?.total_fees.toFixed(2)}`}</div>
             <p className="text-sm text-muted-foreground">Total EPR Fees Collected</p>
           </div>
-          <Button onClick={handleExportPdf} className="w-full h-14 shadow-primary hover:shadow-glow-lg transition-shadow"><Download className="mr-2 h-4 w-4" /> Export PDF/A Audit</Button>
+          <Button onClick={handleExportPdf} className="w-full h-14 shadow-primary hover:shadow-glow-lg transition-shadow"><Download className="mr-2 h-4 w-4" /> Export Audit Report</Button>
         </CardContent>
       </Card>
       <Card className="lg:col-span-2 backdrop-blur-xl shadow-glow hover:shadow-primary/30 transition-all duration-300">
         <CardHeader><CardTitle>Weight by EPR Stream (kg)</CardTitle></CardHeader>
         <CardContent>
           <Suspense fallback={<Loader2 className="animate-spin h-8 w-8 mx-auto" />}>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} className="min-h-[250px]">
               {isLoading ? <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div> :
               <PieChart>
                 <Pie data={streamData} dataKey="weight" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
@@ -221,7 +197,7 @@ function EprReportingTab() {
       </Card>
     </div>
   );
-}
+});
 export function Settings() {
   const user = useAuthStore(s => s.user);
   if (user?.role !== 'admin') {
@@ -238,7 +214,7 @@ export function Settings() {
   return (
     <PageLayout>
       <div className="space-y-8">
-        <h1 className="text-3xl font-bold tracking-tight">System Settings</h1>
+        <h1 className="text-[clamp(2rem,5vw,3rem)] font-display font-bold tracking-tight">System Settings</h1>
         <Tabs defaultValue="roles" className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
             <TabsTrigger value="roles">Role Configuration</TabsTrigger>

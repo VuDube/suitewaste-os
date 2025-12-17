@@ -15,7 +15,7 @@ import type { InventoryLedgerEntry, Supplier, Transaction, EPRReport } from '@sh
 import { useOfflineStore } from '@/stores/useOfflineStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 const KpiCard = memo(({ title, value, icon: Icon, isLoading }: { title: string; value: string | number; icon: React.ElementType; isLoading: boolean }) => (
-  <Card className="group hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 backdrop-blur-xl shadow-glow shadow-primary/20 group-hover:shadow-primary/40">
+  <Card className="group hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 backdrop-blur-xl shadow-glow shadow-primary/20 group-hover:shadow-primary/40 bg-card/80">
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium">{title}</CardTitle>
       <Icon className="h-4 w-4 text-muted-foreground" />
@@ -26,7 +26,7 @@ const KpiCard = memo(({ title, value, icon: Icon, isLoading }: { title: string; 
   </Card>
 ));
 const RecentActivityTable = memo(({ title, data, columns, isLoading, viewAllLink }: { title: string; data: any[]; columns: { header: string; accessor: (item: any) => React.ReactNode }[]; isLoading: boolean; viewAllLink?: string }) => (
-  <Card className="col-span-1 lg:col-span-2 group hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 backdrop-blur-xl shadow-glow shadow-primary/20 group-hover:shadow-primary/40">
+  <Card className="col-span-1 lg:col-span-2 group hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 backdrop-blur-xl shadow-glow shadow-primary/20 group-hover:shadow-primary/40 bg-card/80">
     <CardHeader className="flex flex-row items-center justify-between">
       <CardTitle>{title}</CardTitle>
       {viewAllLink && <Button asChild variant="link" className="text-primary"><Link to={viewAllLink}>View All <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>}
@@ -61,7 +61,7 @@ const DashboardContent = memo(() => {
   const isLoading = isLoadingDashboard || (user && ['admin', 'auditor'].includes(user.role) && isLoadingEpr);
   if (!user) return null;
   return (
-    <Suspense fallback={<div className="grid place-items-center h-64"><Skeleton className="h-12 w-32" /></div>}>
+    <Suspense fallback={<div className="grid place-items-center h-64"><Skeleton className="h-12 w-full rounded-lg" /></div>}>
       {(() => {
         switch (user.role) {
           case 'operator':
@@ -87,7 +87,7 @@ const DashboardContent = memo(() => {
                     { header: 'Date', accessor: (t: Transaction) => format(new Date(t.transaction_timestamp), 'PP') },
                   ]}
                 />
-                <Card className="backdrop-blur-xl shadow-glow shadow-primary/20">
+                <Card className="backdrop-blur-xl shadow-glow shadow-primary/20 bg-card/80">
                   <CardHeader><CardTitle>Hardware Status</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Cable className="h-5 w-5" /> Serial Scale</span><Badge variant={dashboardData?.hardwareStatus?.scale === 'connected' ? 'default' : 'destructive'} className="bg-green-600">{dashboardData?.hardwareStatus?.scale}</Badge></div>
@@ -148,7 +148,7 @@ export function Dashboard() {
             <p className="text-muted-foreground">Welcome back, {user?.username}! Here's your overview.</p>
           </div>
           {totalPending > 0 && (
-            <Alert variant="default" className="w-full sm:w-auto bg-yellow-500/10 border-yellow-500/50 text-yellow-200">
+            <Alert variant="default" className="w-full sm:w-auto bg-yellow-500/10 border-yellow-500/50 text-yellow-200 animate-pulse">
               <Bell className="h-4 w-4 !text-yellow-400" />
               <AlertTitle>Pending Sync</AlertTitle>
               <AlertDescription>{totalPending} items are waiting to be synced.</AlertDescription>
