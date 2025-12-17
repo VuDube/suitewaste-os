@@ -1,4 +1,4 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '@/components/PageLayout';
 import { api } from '@/lib/api-client';
@@ -16,6 +16,8 @@ import { ShieldAlert, Download, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 const COLORS = ['#38761d', '#5a9a47', '#7cb870', '#a0d69a', '#c5f4c3', '#e7f9e6'];
+// As per DFFE Government Gazette 43956
+const EPR_STREAMS = ['Plastic', 'PaperPackaging', 'Glass', 'Metals', 'ElectricalElectronic', 'Other'];
 function UserRolesTable() {
   const queryClient = useQueryClient();
   const { data: users, isLoading } = useQuery({
@@ -42,11 +44,11 @@ function UserRolesTable() {
     if (!user) return;
     setUserChanges(prev => {
       const newChanges = new Map(prev);
-      const currentUserChanges = newChanges.get(userId) || { 
-        id: userId, 
-        role: user.role, 
-        active: user.active, 
-        features: user.features || [] 
+      const currentUserChanges = newChanges.get(userId) || {
+        id: userId,
+        role: user.role,
+        active: user.active,
+        features: user.features || []
       };
       (currentUserChanges as any)[field] = value;
       newChanges.set(userId, currentUserChanges);
@@ -119,28 +121,70 @@ function EprReportingTab() {
     queryKey: ['epr-report'],
     queryFn: () => api<EPRReport>('/api/epr-report'),
   });
-  const streamData = report ? Object.entries(report.streams).map(([name, data]) => ({ name, ...data })) : [];
-  const handleExportXml = () => {
-    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<EPRReport date="${new Date().toISOString()}">
-  <Summary>
-    <CompliancePercentage>${report?.compliance_pct.toFixed(2)}</CompliancePercentage>
-    <TotalFees>${report?.total_fees.toFixed(2)}</TotalFees>
-  </Summary>
-  <Streams>
-    ${streamData.map(s => `<Stream name="${s.name}"><WeightKg>${s.weight}</WeightKg><FeesZAR>${s.fees}</FeesZAR></Stream>`).join('\n    ')}
-  </Streams>
-</EPRReport>`;
-    const blob = new Blob([xmlContent], { type: 'application/xml' });
+  const streamData = useMemo(() => {
+    if (!report) return [];
+    const streams = report.streams || {};
+    return EPR_STREAMS.map(streamName => ({
+      name: streamName.replace('Packaging', ' Pkg').replace('ElectricalElectronic', 'E&E'),
+      weight: streams[streamName]?.weight || 0,
+      fees: streams[streamName]?.fees || 0,
+    })).filter(s => s.weight > 0);
+  }, [report]);
+  const handleExportPdf = async () => {
+    if (!report) return;
+    toast.info("Generating Audit Report...", { description: "This is a mock PDF generation." });
+    // Mock SHA256 hash chain for tamper evidence
+    const encoder = new TextEncoder();
+    let lastHash = '0'.repeat(64); // Genesis hash
+    const reportItems = streamData.map(s => `${s.name}:${s.weight.toFixed(2)}:${s.fees.toFixed(2)}`);
+    for (const item of reportItems) {
+        const data = encoder.encode(item + lastHash);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        lastHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    const pdfContent = `
+      %PDF-1.7
+      %âãÏÓ
+      1 0 obj
+      << /Type /Catalog /Pages 2 0 R >>
+      endobj
+      2 0 obj
+      << /Type /Pages /Kids [3 0 R] /Count 1 >>
+      endobj
+      3 0 obj
+      << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>
+      endobj
+      4 0 obj
+      << /Length 200 >>
+      stream
+      BT
+      /F1 12 Tf
+      72 720 Td
+      (SuiteWaste OS - EPR Audit Report) Tj
+      72 700 Td
+      (Generated: ${new Date().toISOString()}) Tj
+      72 650 Td
+      (Compliance: ${report.compliance_pct.toFixed(2)}%) Tj
+      72 630 Td
+      (Total Fees: ZAR ${report.total_fees.toFixed(2)}) Tj
+      ${streamData.map((s, i) => `72 ${600 - i*20} Td (${s.name}: ${s.weight.toFixed(2)} kg) Tj`).join('\n')}
+      72 100 Td
+      (Audit Hash: ${lastHash}) Tj
+      ET
+      endstream
+      endobj
+      trailer << /Root 1 0 R >>
+      %%EOF
+    `.trim();
+    const blob = new Blob([pdfContent], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'epr-report.xml';
+    a.download = `SuiteWaste_EPR_Audit_${new Date().toISOString().split('T')[0]}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.info("PRO XML Export", { description: "A mock EPR report has been downloaded." });
   };
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -148,14 +192,14 @@ function EprReportingTab() {
         <CardHeader><CardTitle>Compliance Overview</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="text-center">
-            <div className="text-4xl font-bold">{isLoading ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : `${report?.compliance_pct.toFixed(1)}%`}</div>
+            <div className="text-[clamp(2rem,8vw,3rem)] font-bold">{isLoading ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : `${report?.compliance_pct.toFixed(1)}%`}</div>
             <p className="text-sm text-muted-foreground">WEEE Compliant Suppliers</p>
           </div>
           <div className="text-center">
-            <div className="text-4xl font-bold">{isLoading ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : `R ${report?.total_fees.toFixed(2)}`}</div>
+            <div className="text-[clamp(2rem,8vw,3rem)] font-bold">{isLoading ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : `R ${report?.total_fees.toFixed(2)}`}</div>
             <p className="text-sm text-muted-foreground">Total EPR Fees Collected</p>
           </div>
-          <Button onClick={handleExportXml} className="w-full h-14"><Download className="mr-2 h-4 w-4" /> Export PRO XML</Button>
+          <Button onClick={handleExportPdf} className="w-full h-14 shadow-primary hover:shadow-glow-lg transition-shadow"><Download className="mr-2 h-4 w-4" /> Export PDF/A Audit</Button>
         </CardContent>
       </Card>
       <Card className="lg:col-span-2 backdrop-blur-xl shadow-glow hover:shadow-primary/30 transition-all duration-300">
