@@ -13,7 +13,7 @@ import { ArrowRight, BarChart, Bell, BookOpen, Cable, Camera, Users, Weight, Pie
 import { format } from 'date-fns';
 import type { InventoryLedgerEntry, Supplier, Transaction, EPRReport } from '@shared/types';
 import { useOfflineStore } from '@/stores/useOfflineStore';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { useAuth } from '@/hooks/useAuth';
 const KpiCard = memo(({ title, value, icon: Icon, isLoading }: { title: string; value: string | number; icon: React.ElementType; isLoading: boolean }) => (
   <Card className="group hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 backdrop-blur-xl shadow-glow shadow-primary/20 group-hover:shadow-primary/40 bg-card/80">
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -46,7 +46,7 @@ const RecentActivityTable = memo(({ title, data, columns, isLoading, viewAllLink
   </Card>
 ));
 const DashboardContent = memo(() => {
-  const user = useAuthStore(s => s.user);
+  const { user } = useAuth();
   const { data: dashboardData, isLoading: isLoadingDashboard } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api<any>('/api/dashboard'),
@@ -137,7 +137,7 @@ const DashboardContent = memo(() => {
   );
 });
 export function Dashboard() {
-  const user = useAuthStore(s => s.user);
+  const { user } = useAuth();
   const totalPending = useOfflineStore(s => s.totalPending());
   return (
     <PageLayout>

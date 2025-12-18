@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useAuth } from '@/hooks/useAuth';
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: Array<string>;
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed', platform: string }>;
@@ -44,16 +45,16 @@ function usePWAInstall() {
 export function GlobalNav() {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { installPrompt, handleInstall } = usePWAInstall();
-  const user = useAuthStore(s => s.user);
+  const { user } = useAuth();
   const logout = useAuthStore(s => s.logout);
   const navigate = useNavigate();
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-  const accessibleNavItems = navItems.filter(item => 
-    user && 
-    item.roles.includes(user.role) && 
+  const accessibleNavItems = navItems.filter(item =>
+    user &&
+    item.roles.includes(user.role) &&
     (!item.features || item.features.every(f => user.features?.includes(f)))
   );
   const DesktopNavLinks = () => (
