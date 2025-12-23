@@ -27,9 +27,6 @@ export function PageLayout({ children }: PageLayoutProps) {
           </div>
         </div>
       </main>
-      <footer className="py-6 text-center text-sm text-muted-foreground hidden md:block">
-        Built with ❤️ at Cloudflare
-      </footer>
     </div>
   );
 }

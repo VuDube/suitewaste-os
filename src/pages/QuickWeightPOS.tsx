@@ -1,4 +1,5 @@
 import { useState, memo } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,23 +9,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSerialScale } from "@/hooks/useSerialScale";
 import { useOfflineStore } from "@/stores/useOfflineStore";
 import { cn } from "@/lib/utils";
-import { Cable, CheckCircle, CircleDashed, Loader2, Send, XCircle } from "lucide-react";
+import { Cable, CheckCircle, CircleDashed, Loader2, Send, XCircle, ArrowLeft } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import type { Supplier } from "@shared/types";
 import { v4 as uuid } from 'uuid';
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { PageLayout } from "@/components/PageLayout";
 const WeightDisplay = memo(({ weight, status }: { weight: number, status: string }) => (
   <div className="relative w-full text-center mb-6">
     <span
       className={cn(
         "font-mono font-bold tabular-nums transition-all duration-500",
         "text-[clamp(5rem,20vw,12rem)] sm:text-[clamp(6rem,25vw,14rem)]",
-        status === 'connected' || status === 'parsing' 
-          ? "bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent animate-pulse" 
+        status === 'connected' || status === 'parsing'
+          ? "bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent animate-pulse"
           : "text-muted-foreground/50"
       )}
     >
@@ -34,7 +35,7 @@ const WeightDisplay = memo(({ weight, status }: { weight: number, status: string
   </div>
 ));
 export function QuickWeightPOS() {
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { weight, status, connect } = useSerialScale();
   const addLedgerEntry = useOfflineStore(s => s.addLedgerEntry);
@@ -107,19 +108,19 @@ export function QuickWeightPOS() {
     parsing: <CheckCircle className="h-5 w-5 text-green-500 animate-pulse" />,
     error: <XCircle className="h-5 w-5 text-red-500" />,
   };
-  if (isAuthLoading) {
-    return <div className="h-dvh w-full flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  }
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
   return (
-    <div className="h-dvh w-full flex flex-col overflow-hidden bg-background text-foreground">
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 p-4 md:p-6 lg:p-8 overflow-y-auto">
+    <PageLayout>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 overflow-hidden">
         <div className="md:col-span-2 flex flex-col">
           <Card className="bg-card/80 border-border backdrop-blur-xl shadow-glow shadow-primary/40 hover:shadow-primary/60 transition-shadow flex-1 flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-lg font-medium text-muted-foreground">Live Weight</CardTitle>
+              <div className="flex items-center gap-4">
+                <Link to="/" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
+                  <ArrowLeft className="h-4 w-4" />
+                  <span className="text-xs font-semibold hidden sm:inline">Dashboard</span>
+                </Link>
+                <CardTitle className="text-lg font-medium text-muted-foreground">Live Weight</CardTitle>
+              </div>
               <div className="flex items-center gap-2 text-sm capitalize text-muted-foreground">
                 {statusIndicator[status]}
                 {status}
@@ -191,6 +192,6 @@ export function QuickWeightPOS() {
         </div>
       </div>
       <Toaster richColors theme="dark" />
-    </div>
+    </PageLayout>
   );
 }

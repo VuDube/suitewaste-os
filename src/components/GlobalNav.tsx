@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import { HardHat, Menu, LayoutDashboard, Weight, Users, BookOpen, Settings2, Download, LogOut, FileText, MessageCircle } from 'lucide-react';
+import { HardHat, Menu, LayoutDashboard, Weight, Users, BookOpen, Settings2, LogOut, FileText, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -10,11 +10,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: Array<string>;
-  readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed', platform: string }>;
-  prompt(): Promise<void>;
-}
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'manager', 'admin', 'auditor'] },
   { href: '/quick-weight', label: 'Weigh', icon: Weight, roles: ['operator', 'manager', 'admin'] },
@@ -73,7 +68,8 @@ export function GlobalNav() {
           </div>
         </div>
       </header>
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-background/95 backdrop-blur-sm border-t z-50">
+      {/* Mobile Nav */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-24 bg-background/95 backdrop-blur-sm border-t z-50 pb-[env(safe-area-inset-bottom)]">
          <div className="grid h-full max-w-lg grid-cols-5 mx-auto">
             {accessibleNavItems.slice(0, 4).map(item => (
                  <NavLink key={item.href} to={item.href} className={({isActive}) => cn("inline-flex flex-col items-center justify-center px-1 group", isActive ? "text-primary" : "text-muted-foreground")}>
@@ -85,7 +81,7 @@ export function GlobalNav() {
                 <SheetTrigger asChild>
                     <button className="flex flex-col items-center justify-center text-muted-foreground"><Menu className="w-6 h-6 mb-1" /><span className="text-[10px]">More</span></button>
                 </SheetTrigger>
-                <SheetContent side="bottom" className="h-auto p-6 rounded-t-3xl">
+                <SheetContent side="bottom" className="h-auto p-6 rounded-t-3xl pb-[max(2.5rem,env(safe-area-inset-bottom))]">
                     <div className="grid grid-cols-3 gap-4">
                       {accessibleNavItems.map(item => (
                         <NavLink key={item.href} to={item.href} onClick={() => setMobileMenuOpen(false)} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-accent/50 text-xs font-medium">
