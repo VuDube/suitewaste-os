@@ -1,3 +1,12 @@
-
-# Bootstrap marker
+# SuiteWaste OS Git Ignore Rules
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+wrangler-dist/
+coverage/
+.DS_Store
+# Persistent build markers
 .bootstrap-complete
+# Environment stability: DO NOT ignore bun.lock or bun.lockb
+# These are essential for reproducible production builds.

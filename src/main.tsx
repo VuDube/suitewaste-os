@@ -26,8 +26,10 @@ const queryClient = new QueryClient({
       staleTime: 30 * 1000, // 30 seconds
       gcTime: 5 * 60 * 1000, // 5 minutes
       retry: (failureCount, error) => {
+        // Standard production performance: avoid long hangs on auth/404 errors
         if ((error as any)?.status === 404 || (error as any)?.status === 401) return false;
-        return failureCount < 2;
+        // Target high-performance retry strategy for production
+        return failureCount < 1;
       },
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
