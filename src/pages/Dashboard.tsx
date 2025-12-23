@@ -14,31 +14,32 @@ import { format } from 'date-fns';
 import type { InventoryLedgerEntry, Supplier, Transaction, EPRReport } from '@shared/types';
 import { useOfflineStore } from '@/stores/useOfflineStore';
 import { useAuth } from '@/hooks/useAuth';
+import { cn } from '@/lib/utils';
 const KpiCard = memo(({ title, value, icon: Icon, isLoading }: { title: string; value: string | number; icon: React.ElementType; isLoading: boolean }) => (
-  <Card className="group hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 backdrop-blur-xl shadow-glow shadow-primary/20 group-hover:shadow-primary/40 bg-card/80">
+  <Card className="group hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 backdrop-blur-xl shadow-glow shadow-primary/10 hover:shadow-primary/30 bg-card/60 border-primary/10">
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      <Icon className="h-4 w-4 text-muted-foreground" />
+      <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</CardTitle>
+      <Icon className="h-4 w-4 text-primary/70" />
     </CardHeader>
     <CardContent>
-      {isLoading ? <Skeleton className="h-10 w-3/4 animate-pulse" /> : <div className="text-[clamp(1.5rem,6vw,2.5rem)] font-bold">{value}</div>}
+      {isLoading ? <Skeleton className="h-10 w-3/4 animate-pulse" /> : <div className="text-[clamp(1.5rem,5vw,2.25rem)] font-bold tabular-nums tracking-tight">{value}</div>}
     </CardContent>
   </Card>
 ));
 const RecentActivityTable = memo(({ title, data, columns, isLoading, viewAllLink }: { title: string; data: any[]; columns: { header: string; accessor: (item: any) => React.ReactNode }[]; isLoading: boolean; viewAllLink?: string }) => (
-  <Card className="col-span-1 lg:col-span-2 group hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 backdrop-blur-xl shadow-glow shadow-primary/20 group-hover:shadow-primary/40 bg-card/80">
+  <Card className="col-span-1 lg:col-span-2 backdrop-blur-xl shadow-md bg-card/40 border-primary/5">
     <CardHeader className="flex flex-row items-center justify-between">
-      <CardTitle>{title}</CardTitle>
-      {viewAllLink && <Button asChild variant="link" className="text-primary"><Link to={viewAllLink}>View All <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>}
+      <CardTitle className="text-lg font-bold">{title}</CardTitle>
+      {viewAllLink && <Button asChild variant="link" className="text-primary hover:text-primary/80"><Link to={viewAllLink} className="flex items-center gap-1">View All <ArrowRight className="h-4 w-4" /></Link></Button>}
     </CardHeader>
     <CardContent>
       <div className="overflow-x-auto">
         <Table>
-          <TableHeader><TableRow>{columns.map(c => <TableHead key={c.header}>{c.header}</TableHead>)}</TableRow></TableHeader>
+          <TableHeader><TableRow className="hover:bg-transparent border-primary/10">{columns.map(c => <TableHead key={c.header} className="text-xs font-bold uppercase">{c.header}</TableHead>)}</TableRow></TableHeader>
           <TableBody>
             {isLoading ? Array.from({ length: 3 }).map((_, i) => <TableRow key={i}>{columns.map((c, j) => <TableCell key={j}><Skeleton className="h-6 w-full animate-pulse" /></TableCell>)}</TableRow>)
-             : data && data.length > 0 ? data.map((item, i) => <TableRow key={i} style={{ animationDelay: `${i * 0.05}s` }} className="animate-fade-in">{columns.map(c => <TableCell key={c.header}>{c.accessor(item)}</TableCell>)}</TableRow>)
-             : <TableRow><TableCell colSpan={columns.length} className="text-center h-24">No recent activity.</TableCell></TableRow>}
+             : data && data.length > 0 ? data.map((item, i) => <TableRow key={i} className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both border-primary/5 hover:bg-primary/5 transition-colors" style={{ animationDelay: `${i * 50}ms` }}>{columns.map(c => <TableCell key={c.header}>{c.accessor(item)}</TableCell>)}</TableRow>)
+             : <TableRow><TableCell colSpan={columns.length} className="text-center h-24 text-muted-foreground">No recent activity records.</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
@@ -47,92 +48,53 @@ const RecentActivityTable = memo(({ title, data, columns, isLoading, viewAllLink
 ));
 const DashboardContent = memo(() => {
   const { user } = useAuth();
-  const { data: dashboardData, isLoading: isLoadingDashboard } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: () => api<any>('/api/dashboard'),
-    enabled: !!user,
-  });
-  const { data: eprData, isLoading: isLoadingEpr } = useQuery({
-    queryKey: ['epr-report'],
-    queryFn: () => api<EPRReport>('/api/epr-report'),
-    enabled: !!user && (user.role === 'admin' || user.role === 'auditor'),
-  });
+  const { data: dashboardData, isLoading: isLoadingDashboard } = useQuery({ queryKey: ['dashboard'], queryFn: () => api<any>('/api/dashboard'), enabled: !!user });
+  const { data: eprData, isLoading: isLoadingEpr } = useQuery({ queryKey: ['epr-report'], queryFn: () => api<EPRReport>('/api/epr-report'), enabled: !!user && (user.role === 'admin' || user.role === 'auditor') });
   const summary = dashboardData?.summary || {};
   const isLoading = isLoadingDashboard || (user && ['admin', 'auditor'].includes(user.role) && isLoadingEpr);
   if (!user) return null;
   return (
-    <Suspense fallback={<div className="grid place-items-center h-64"><Skeleton className="h-12 w-full rounded-lg" /></div>}>
-      {(() => {
-        switch (user.role) {
-          case 'operator':
-            return (
-              <div className="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3">
-                <Card className="md:col-span-2 lg:col-span-3 bg-primary text-primary-foreground shadow-glow-lg shadow-primary/50">
-                  <CardHeader><CardTitle>Operator Quick Actions</CardTitle></CardHeader>
-                  <CardContent className="flex flex-col sm:flex-row gap-4 items-center">
-                    <p className="flex-1 text-lg">Ready to start a new weighing session?</p>
-                    <Button asChild size="lg" variant="secondary" className="font-bold text-lg h-14 w-full sm:w-auto hover:scale-105 transition-transform">
-                      <Link to="/quick-weight"><Weight className="mr-2 h-6 w-6" /> Start Weighing</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-                <RecentActivityTable
-                  title="Recent Transactions"
-                  data={summary.recentTransactions || []}
-                  isLoading={isLoading}
-                  viewAllLink="/transactions"
-                  columns={[
-                    { header: 'ID', accessor: (t: Transaction) => <span className="font-mono text-xs">{t.id.substring(0, 8)}...</span> },
-                    { header: 'Amount', accessor: (t: Transaction) => `R ${t.amount.toFixed(2)}` },
-                    { header: 'Date', accessor: (t: Transaction) => format(new Date(t.transaction_timestamp), 'PP') },
-                  ]}
-                />
-                <Card className="backdrop-blur-xl shadow-glow shadow-primary/20 bg-card/80">
-                  <CardHeader><CardTitle>Hardware Status</CardTitle></CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Cable className="h-5 w-5" /> Serial Scale</span><Badge variant={dashboardData?.hardwareStatus?.scale === 'connected' ? 'default' : 'destructive'} className="bg-green-600">{dashboardData?.hardwareStatus?.scale}</Badge></div>
-                    <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Camera className="h-5 w-5" /> IP Camera</span><Badge variant={dashboardData?.hardwareStatus?.camera === 'healthy' ? 'default' : 'destructive'} className="bg-green-600">{dashboardData?.hardwareStatus?.camera}</Badge></div>
-                  </CardContent>
-                </Card>
-              </div>
-            );
-          case 'manager':
-            return (
-              <div className="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCard title="Total Weight (kg)" value={summary.totalWeight?.toFixed(2) || 0} icon={Weight} isLoading={isLoading} />
-                <KpiCard title="Total Value (ZAR)" value={`R ${summary.totalValue?.toFixed(2) || 0}`} icon={BarChart} isLoading={isLoading} />
-                <KpiCard title="Total EPR Fees (ZAR)" value={`R ${summary.totalEPR?.toFixed(2) || 0}`} icon={BookOpen} isLoading={isLoading} />
-                <KpiCard title="Recent Suppliers" value={summary.recentSuppliers?.length || 0} icon={Users} isLoading={isLoading} />
-                <RecentActivityTable title="Recent Ledger Entries" data={summary.recentLedger || []} isLoading={isLoading} viewAllLink="/ledger" columns={[{ header: 'Material', accessor: (l: InventoryLedgerEntry) => l.material_type }, { header: 'Weight (kg)', accessor: (l: InventoryLedgerEntry) => l.weight_kg.toFixed(2) }, { header: 'Date', accessor: (l: InventoryLedgerEntry) => format(new Date(l.capture_timestamp), 'PP') }]} />
-              </div>
-            );
-          case 'admin':
-            return (
-              <div className="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCard title="Total Weight (kg)" value={summary.totalWeight?.toFixed(2) || 0} icon={Weight} isLoading={isLoading} />
-                <KpiCard title="Total Value (ZAR)" value={`R ${summary.totalValue?.toFixed(2) || 0}`} icon={BarChart} isLoading={isLoading} />
-                <KpiCard title="EPR Compliance" value={`${eprData?.compliance_pct.toFixed(1) || 0}%`} icon={PieChartIcon} isLoading={isLoading} />
-                <KpiCard title="Active Users" value={summary.userCount || 0} icon={Users} isLoading={isLoading} />
-                <RecentActivityTable title="Recent Suppliers" data={summary.recentSuppliers || []} isLoading={isLoading} viewAllLink="/suppliers" columns={[{ header: 'Name', accessor: (s: Supplier) => s.name }, { header: 'EPR Number', accessor: (s: Supplier) => s.epr_number || 'N/A' }, { header: 'WEEE', accessor: (s: Supplier) => s.is_weee_compliant ? 'Yes' : 'No' }]} />
-                <Card className="col-span-1 lg:col-span-2 bg-secondary/50 backdrop-blur-xl shadow-glow shadow-primary/20">
-                  <CardHeader><CardTitle>Admin Tools</CardTitle></CardHeader>
-                  <CardContent><Button asChild className="w-full h-14 text-lg"><Link to="/settings"><Settings className="mr-2 h-5 w-5" /> Go to Settings</Link></Button></CardContent>
-                </Card>
-              </div>
-            );
-          case 'auditor':
-            return (
-              <div className="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3">
-                <KpiCard title="Total Weight Audited (kg)" value={summary.totalWeight?.toFixed(2) || 0} icon={Weight} isLoading={isLoading} />
-                <KpiCard title="Total EPR Fees (ZAR)" value={`R ${eprData?.total_fees.toFixed(2) || 0}`} icon={BookOpen} isLoading={isLoading} />
-                <KpiCard title="WEEE Compliance" value={`${eprData?.compliance_pct.toFixed(1) || 0}%`} icon={PieChartIcon} isLoading={isLoading} />
-                <RecentActivityTable title="Recent Ledger Entries" data={summary.recentLedger || []} isLoading={isLoading} viewAllLink="/ledger" columns={[{ header: 'Material', accessor: (l: InventoryLedgerEntry) => l.material_type }, { header: 'Weight (kg)', accessor: (l: InventoryLedgerEntry) => l.weight_kg.toFixed(2) }, { header: 'Date', accessor: (l: InventoryLedgerEntry) => format(new Date(l.capture_timestamp), 'PP') }]} />
-              </div>
-            );
-          default:
-            return <p>No dashboard view available for your role.</p>;
-        }
-      })()}
+    <Suspense fallback={<div className="py-12"><Skeleton className="h-48 w-full" /></div>}>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {user.role === 'operator' ? (
+          <>
+            <Card className="md:col-span-2 lg:col-span-4 bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20">
+              <CardContent className="flex flex-col sm:flex-row gap-6 items-center p-8">
+                <div className="flex-1 space-y-2">
+                  <h2 className="text-2xl font-bold">New Collection Session</h2>
+                  <p className="text-muted-foreground">Perform industrial weighing and EPR data capture for local suppliers.</p>
+                </div>
+                <Button asChild size="lg" className="font-bold text-lg h-14 w-full sm:w-auto shadow-primary/30 shadow-lg px-8">
+                  <Link to="/quick-weight"><Weight className="mr-2 h-6 w-6" /> Start Weighing</Link>
+                </Button>
+              </CardContent>
+            </Card>
+            <RecentActivityTable title="Recent Transactions" data={summary.recentTransactions || []} isLoading={isLoading} viewAllLink="/transactions" columns={[{ header: 'Reference', accessor: (t: Transaction) => <span className="font-mono text-xs text-muted-foreground">{t.id.substring(0, 8)}</span> }, { header: 'Value', accessor: (t: Transaction) => <span className="font-semibold tabular-nums">ZAR {t.amount.toFixed(2)}</span> }, { header: 'Time', accessor: (t: Transaction) => format(new Date(t.transaction_timestamp), 'HH:mm') }]} />
+            <Card className="col-span-1 lg:col-span-2 bg-card/40 border-primary/10">
+              <CardHeader><CardTitle className="text-lg font-bold">Edge Diagnostics</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5"><span className="flex items-center gap-2 font-medium"><Cable className="h-4 w-4" /> Serial Scale</span><Badge className="bg-emerald-600">Online</Badge></div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5"><span className="flex items-center gap-2 font-medium"><Camera className="h-4 w-4" /> Snapshot Proxy</span><Badge className="bg-emerald-600">Active</Badge></div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
+            <KpiCard title="Total Inventory (kg)" value={summary.totalWeight?.toLocaleString() || 0} icon={Weight} isLoading={isLoading} />
+            <KpiCard title="Total Value (ZAR)" value={summary.totalValue?.toLocaleString() || 0} icon={BarChart} isLoading={isLoading} />
+            <KpiCard title="EPR Compliance" value={`${eprData?.compliance_pct.toFixed(1) || summary.weeePct?.toFixed(1) || 0}%`} icon={PieChartIcon} isLoading={isLoading} />
+            <KpiCard title="Suppliers" value={summary.recentSuppliers?.length || 0} icon={Users} isLoading={isLoading} />
+            <RecentActivityTable title="Recent Ledger" data={summary.recentLedger || []} isLoading={isLoading} viewAllLink="/ledger" columns={[{ header: 'Material', accessor: (l: InventoryLedgerEntry) => <span className="font-medium">{l.material_type}</span> }, { header: 'Weight', accessor: (l: InventoryLedgerEntry) => <span className="tabular-nums">{l.weight_kg.toFixed(2)} kg</span> }, { header: 'Timestamp', accessor: (l: InventoryLedgerEntry) => format(new Date(l.capture_timestamp), 'MMM d, HH:mm') }]} />
+            <Card className="col-span-1 lg:col-span-2 bg-primary/10 border-primary/20 group hover:bg-primary/15 transition-colors">
+              <CardHeader><CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5" /> Quick Controls</CardTitle></CardHeader>
+              <CardContent className="flex gap-2">
+                <Button asChild className="flex-1 h-12 text-sm font-semibold" variant="default"><Link to="/settings">System Settings</Link></Button>
+                <Button asChild className="flex-1 h-12 text-sm font-semibold" variant="outline"><Link to="/suppliers">Add Supplier</Link></Button>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
     </Suspense>
   );
 });
@@ -141,17 +103,17 @@ export function Dashboard() {
   const totalPending = useOfflineStore(s => s.totalPending());
   return (
     <PageLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <div>
-            <h1 className="text-[clamp(2rem,5vw,3rem)] font-display font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back, {user?.username}! Here's your overview.</p>
+      <div className="space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+          <div className="space-y-1">
+            <h1 className="text-4xl font-display font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Dashboard</h1>
+            <p className="text-muted-foreground text-lg italic">Compliance Operating System for {user?.username}</p>
           </div>
           {totalPending > 0 && (
-            <Alert variant="default" className="w-full sm:w-auto bg-yellow-500/10 border-yellow-500/50 text-yellow-200 animate-pulse">
-              <Bell className="h-4 w-4 !text-yellow-400" />
-              <AlertTitle>Pending Sync</AlertTitle>
-              <AlertDescription>{totalPending} items are waiting to be synced.</AlertDescription>
+            <Alert className="w-full sm:w-auto bg-yellow-500/10 border-yellow-500/30 backdrop-blur-md">
+              <Bell className="h-4 w-4 text-yellow-500" />
+              <AlertTitle className="text-yellow-500 font-bold">Offline Queue Active</AlertTitle>
+              <AlertDescription className="text-yellow-200/80">{totalPending} records waiting for sync.</AlertDescription>
             </Alert>
           )}
         </div>

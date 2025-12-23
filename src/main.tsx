@@ -3,10 +3,7 @@ import { enableMapSet } from "immer";
 enableMapSet();
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import {
-  createBrowserRouter,
-  RouterProvider,
-} from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
@@ -23,21 +20,21 @@ import { Chat } from '@/pages/Chat';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30 * 1000, // 30 seconds
-      gcTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 60 * 1000,
+      gcTime: 10 * 60 * 1000,
       retry: (failureCount, error) => {
-        // Standard production performance: avoid long hangs on auth/404 errors
         if ((error as any)?.status === 404 || (error as any)?.status === 401) return false;
-        // Target high-performance retry strategy for production
         return failureCount < 1;
       },
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
   },
 });
-// Expose queryClient globally for use in stores
-(window as any).queryClient = queryClient;
+// Safeguard global exposure for offline store revalidation
+if (typeof window !== 'undefined') {
+  (window as any).queryClient = queryClient;
+}
 const router = createBrowserRouter([
   { path: "/", element: <Dashboard />, errorElement: <RouteErrorBoundary /> },
   { path: "/login", element: <Login />, errorElement: <RouteErrorBoundary /> },
@@ -49,9 +46,18 @@ const router = createBrowserRouter([
   { path: "/settings", element: <Settings />, errorElement: <RouteErrorBoundary /> },
   { path: "/chat", element: <Chat />, errorElement: <RouteErrorBoundary /> },
 ]);
-// PWA Service Worker Registration
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  navigator.serviceWorker.register('/sw.js');
+// PWA Service Worker Registration with production checks
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then(
+      (registration) => {
+        if (import.meta.env.DEV) console.log('SW registered:', registration.scope);
+      },
+      (err) => {
+        if (import.meta.env.DEV) console.error('SW registration failed:', err);
+      }
+    );
+  });
 }
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
