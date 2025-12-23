@@ -47,14 +47,15 @@ const router = createBrowserRouter([
   { path: "/chat", element: <Chat />, errorElement: <RouteErrorBoundary /> },
 ]);
 // PWA Service Worker Registration with production checks
-if ('serviceWorker' in navigator) {
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
+    if (import.meta.env.DEV) return;
     navigator.serviceWorker.register('/sw.js').then(
       (registration) => {
-        if (import.meta.env.DEV) console.log('SW registered:', registration.scope);
+        console.log('SW registered:', registration.scope);
       },
       (err) => {
-        if (import.meta.env.DEV) console.error('SW registration failed:', err);
+        console.error('SW registration failed:', err);
       }
     );
   });
