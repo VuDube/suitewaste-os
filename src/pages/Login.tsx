@@ -1,5 +1,6 @@
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { api } from '@/lib/api-client';
@@ -22,6 +23,12 @@ export function Login() {
   const navigate = useNavigate();
   const loginAction = useAuthStore((s) => s.login);
   const { register, handleSubmit } = useForm<LoginFormInputs>();
+  // Ensure system is seeded on first load to prevent "User not found" errors
+  useQuery({
+    queryKey: ['auth-init'],
+    queryFn: () => api<{ seeded: boolean }>('/api/auth/init'),
+    retry: 3,
+  });
   const mutation = useMutation({
     mutationFn: (credentials: LoginFormInputs) => api<LoginResponse>('/api/auth/login', {
       method: 'POST',
@@ -30,11 +37,10 @@ export function Login() {
     onSuccess: (data) => {
       loginAction(data.user, data.token);
       toast.success(`Welcome back, ${data.user.username}!`);
-      // Role-based redirect can be added here
       if (data.user.role === 'operator') {
         navigate('/quick-weight');
       } else {
-        navigate('/dashboard');
+        navigate('/');
       }
     },
     onError: (error) => {
@@ -60,11 +66,24 @@ export function Login() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
-              <Input id="username" type="text" placeholder="e.g., operator1" required {...register('username')} />
+              <Input 
+                id="username" 
+                type="text" 
+                placeholder="e.g., operator1" 
+                required 
+                {...register('username')} 
+                className="bg-secondary/50"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password / PIN</Label>
-              <Input id="password" type="password" required {...register('password')} />
+              <Input 
+                id="password" 
+                type="password" 
+                required 
+                {...register('password')} 
+                className="bg-secondary/50"
+              />
             </div>
             <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={mutation.isPending}>
               {mutation.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'Log In'}

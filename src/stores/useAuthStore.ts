@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { del, get, set } from 'idb-keyval';
 import type { User } from '@shared/types';
 interface AuthState {
   user: User | null;
@@ -10,14 +9,9 @@ interface AuthState {
   logout: () => void;
   setUser: (user: User) => void;
 }
-const storage = {
-  getItem: async (name: string): Promise<string | null> => (await get(name)) || null,
-  setItem: async (name: string, value: string): Promise<void> => { await set(name, value); },
-  removeItem: async (name: string): Promise<void> => { await del(name); },
-};
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
@@ -35,7 +29,13 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'suitewaste-auth-storage',
-      storage: createJSONStorage(() => storage),
+      storage: createJSONStorage(() => localStorage),
+      // Ensure state is rehydrated correctly from localStorage
+      onRehydrateStorage: () => (state) => {
+        if (state && state.token) {
+          state.isAuthenticated = true;
+        }
+      },
     }
   )
 );
