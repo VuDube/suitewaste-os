@@ -1,6 +1,16 @@
 import { IndexedEntity } from "./core-utils";
-import type { Supplier, InventoryLedgerEntry, Transaction, User } from "@shared/types";
+import type { Supplier, InventoryLedgerEntry, Transaction, User, Session } from "@shared/types";
 import { MOCK_SUPPLIERS, MOCK_INVENTORY_LEDGER, MOCK_TRANSACTIONS, MOCK_USERS } from "@shared/mock-data";
+// SESSION ENTITY
+export class SessionEntity extends IndexedEntity<Session> {
+  static readonly entityName = "session";
+  static readonly indexName = "sessions";
+  static readonly initialState: Session = {
+    id: "",
+    userId: "",
+    createdAt: 0,
+  };
+}
 // SUPPLIER ENTITY
 export class SupplierEntity extends IndexedEntity<Supplier> {
   static readonly entityName = "supplier";

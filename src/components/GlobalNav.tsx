@@ -7,6 +7,9 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useAuth } from '@/hooks/useAuth';
+import { api } from '@/lib/api-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: Array<string>;
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed', platform: string }>;
@@ -22,79 +25,28 @@ const navItems = [
   { href: '/hardware', label: 'Hardware', icon: Settings2, roles: ['admin'] },
   { href: '/settings', label: 'Settings', icon: Settings2, roles: ['admin'] },
 ];
-function usePWAInstall() {
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e as BeforeInstallPromptEvent);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-  }, []);
-  const handleInstall = async () => {
-    if (!installPrompt) return;
-    await installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setInstallPrompt(null);
-    }
-  };
-  return { installPrompt, handleInstall };
-}
 export function GlobalNav() {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { installPrompt, handleInstall } = usePWAInstall();
   const { user } = useAuth();
   const logout = useAuthStore(s => s.logout);
   const navigate = useNavigate();
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const queryClient = useQueryClient();
+  const handleLogout = async () => {
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.warn("Logout endpoint failed, proceeding with local cleanup");
+    } finally {
+      logout();
+      queryClient.clear();
+      toast.success("Logged out successfully");
+      navigate('/login', { replace: true });
+    }
   };
   const accessibleNavItems = navItems.filter(item =>
     user &&
     item.roles.includes(user.role) &&
     (!item.features || item.features.every(f => user.features?.includes(f)))
-  );
-  const DesktopNavLinks = () => (
-    <nav className="hidden md:flex items-center gap-1">
-      {accessibleNavItems.map((item) => (
-        <NavLink
-          key={item.href}
-          to={item.href}
-          className={({ isActive }) =>
-            cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            )
-          }
-        >
-          <item.icon className="h-4 w-4" />
-          {item.label}
-        </NavLink>
-      ))}
-    </nav>
-  );
-  const MobileNavLinks = () => (
-    <nav className="grid grid-cols-3 gap-2">
-      {accessibleNavItems.map((item) => (
-        <NavLink
-          key={item.href}
-          to={item.href}
-          onClick={() => setMobileMenuOpen(false)}
-          className={({ isActive }) =>
-            cn(
-              "flex flex-col items-center justify-center gap-1 rounded-lg p-2 h-20 text-xs font-medium transition-colors",
-              isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            )
-          }
-        >
-          <item.icon className="h-6 w-6" />
-          <span>{item.label}</span>
-        </NavLink>
-      ))}
-    </nav>
   );
   return (
     <>
@@ -106,40 +58,42 @@ export function GlobalNav() {
                 <HardHat className="h-7 w-7 text-primary" />
                 <span className="text-lg font-bold tracking-tighter">SuiteWaste OS</span>
               </Link>
-              <DesktopNavLinks />
+              <nav className="flex items-center gap-1">
+                {accessibleNavItems.map((item) => (
+                  <NavLink key={item.href} to={item.href} className={({ isActive }) => cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors", isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>
+                    <item.icon className="h-4 w-4" /> {item.label}
+                  </NavLink>
+                ))}
+              </nav>
             </div>
             <div className="flex items-center gap-2">
-              {installPrompt && (
-                <Button onClick={handleInstall} variant="outline" size="sm"><Download className="mr-2 h-4 w-4" /> Install</Button>
-              )}
               <ThemeToggle className="relative top-0 right-0" />
               <Button onClick={handleLogout} variant="ghost" size="icon" aria-label="Logout"><LogOut className="h-5 w-5" /></Button>
             </div>
           </div>
         </div>
       </header>
-      {/* Mobile Bottom Nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-background/95 backdrop-blur-sm border-t z-50 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.3)]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-background/95 backdrop-blur-sm border-t z-50">
          <div className="grid h-full max-w-lg grid-cols-5 mx-auto">
             {accessibleNavItems.slice(0, 4).map(item => (
-                 <NavLink key={item.href} to={item.href} className={({isActive}) => cn("inline-flex flex-col items-center justify-center px-1 hover:bg-accent group transition-colors duration-200", isActive ? "text-primary" : "text-muted-foreground")}>
+                 <NavLink key={item.href} to={item.href} className={({isActive}) => cn("inline-flex flex-col items-center justify-center px-1 group", isActive ? "text-primary" : "text-muted-foreground")}>
                     <item.icon className="w-6 h-6 mb-1" />
-                    <span className="text-xs sr-only sm:not-sr-only">{item.label}</span>
+                    <span className="text-[10px]">{item.label}</span>
                 </NavLink>
             ))}
              <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
-                    <button type="button" className="inline-flex flex-col items-center justify-center px-1 hover:bg-accent group text-muted-foreground">
-                        <Menu className="w-6 h-6 mb-1" />
-                        <span className="text-xs sr-only sm:not-sr-only">More</span>
-                    </button>
+                    <button className="flex flex-col items-center justify-center text-muted-foreground"><Menu className="w-6 h-6 mb-1" /><span className="text-[10px]">More</span></button>
                 </SheetTrigger>
-                <SheetContent side="bottom" className="h-auto rounded-t-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                    <MobileNavLinks />
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                        {installPrompt && <Button onClick={handleInstall} variant="outline" className="h-12"><Download className="mr-2 h-4 w-4" /> Install App</Button>}
-                        <Button onClick={handleLogout} variant="outline" className="h-12"><LogOut className="mr-2 h-4 w-4" /> Logout</Button>
+                <SheetContent side="bottom" className="h-auto p-6 rounded-t-3xl">
+                    <div className="grid grid-cols-3 gap-4">
+                      {accessibleNavItems.map(item => (
+                        <NavLink key={item.href} to={item.href} onClick={() => setMobileMenuOpen(false)} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-accent/50 text-xs font-medium">
+                          <item.icon className="h-6 w-6" /> {item.label}
+                        </NavLink>
+                      ))}
                     </div>
+                    <Button onClick={handleLogout} variant="outline" className="w-full mt-6 h-12 rounded-xl text-destructive"><LogOut className="mr-2 h-4 w-4" /> Logout</Button>
                 </SheetContent>
             </Sheet>
          </div>

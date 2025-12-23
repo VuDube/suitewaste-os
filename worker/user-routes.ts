@@ -1,15 +1,14 @@
 import { Hono } from "hono";
 import type { Context, Next } from 'hono';
-import { SupplierEntity, InventoryLedgerEntity, TransactionEntity, UserEntity } from "./entities";
+import { SupplierEntity, InventoryLedgerEntity, TransactionEntity, UserEntity, SessionEntity } from "./entities";
 import { ok, bad, notFound } from './core-utils';
-import type { InventoryLedgerEntry, Supplier, Transaction, User, ConfigUserUpdate } from "@shared/types";
+import type { InventoryLedgerEntry, Supplier, Transaction, User, ConfigUserUpdate, Session } from "@shared/types";
 import { HTTPException } from "hono/http-exception";
-// Define local types to break circular dependency with index.ts
 export interface Env {
   GlobalDurableObject: DurableObjectNamespace<any>;
 }
-export type HonoApp = Hono<{ Bindings: Env; Variables: { user?: User } }>;
-export type HonoContext = Context<{ Bindings: Env; Variables: { user?: User } }>;
+export type HonoApp = Hono<{ Bindings: Env; Variables: { user?: User; sessionId?: string } }>;
+export type HonoContext = Context<{ Bindings: Env; Variables: { user?: User; sessionId?: string } }>;
 const unauthorized = () => new HTTPException(401, { message: 'Unauthorized' });
 const forbidden = () => new HTTPException(403, { message: 'Forbidden' });
 const getEprStream = (materialType: string): string => {
@@ -25,18 +24,20 @@ export function userRoutes(app: HonoApp) {
   // --- AUTH MIDDLEWARE ---
   app.use('/api/*', async (c: HonoContext, next: Next) => {
     const path = c.req.path;
-    if (['/api/auth/init', '/api/auth/login', '/api/health', '/api/version'].some(p => path.startsWith(p))) {
+    if (['/api/auth/init', '/api/auth/login', '/api/health'].some(p => path.startsWith(p))) {
       return next();
     }
     const authHeader = c.req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) throw unauthorized();
     const token = authHeader.split(' ')[1];
-    const user = await new UserEntity(c.env, token).getState();
+    const session = await new SessionEntity(c.env, token).getState();
+    if (!session || !session.userId) throw unauthorized();
+    const user = await new UserEntity(c.env, session.userId).getState();
     if (!user || !user.id || !user.active) throw unauthorized();
     c.set('user', user);
+    c.set('sessionId', token);
     await next();
   });
-  // --- ROLE-BASED MIDDLEWARE ---
   const requireRole = (roles: User['role'][]) => async (c: HonoContext, next: Next) => {
     const user = c.get('user');
     if (!user || !roles.includes(user.role)) throw forbidden();
@@ -47,26 +48,44 @@ export function userRoutes(app: HonoApp) {
     const allUsers = (await UserEntity.list(c.env, null, 1)).items;
     if (allUsers.length === 0) {
       await UserEntity.ensureSeed(c.env);
-      return ok(c, { seeded: true, message: "Initial users seeded." });
+      return ok(c, { seeded: true });
     }
-    return ok(c, { seeded: false, message: "Users already exist." });
+    return ok(c, { seeded: false });
   });
   app.post('/api/auth/login', async (c: HonoContext) => {
-    const allUsersCheck = (await UserEntity.list(c.env, null, 1)).items;
-    if (allUsersCheck.length === 0) await UserEntity.ensureSeed(c.env);
     const { username, password } = await c.req.json<{ username?: string; password?: string }>();
-    if (!username || !password) return bad(c, 'Username and password are required');
+    if (!username || !password) return bad(c, 'Username and password required');
     const allUsers = (await UserEntity.list(c.env, null, 100)).items;
     const user = allUsers.find(u => u.username === username && u.password_hash === password);
-    if (!user || !user.active) return notFound(c, 'Invalid credentials or inactive user');
+    if (!user || !user.active) return bad(c, 'Invalid credentials');
+    const sessionId = crypto.randomUUID();
+    await SessionEntity.create(c.env, {
+      id: sessionId,
+      userId: user.id,
+      createdAt: Date.now()
+    });
     const { password_hash, ...userWithoutPassword } = user;
-    return ok(c, { user: userWithoutPassword, token: user.id });
+    return ok(c, { user: userWithoutPassword, token: sessionId });
+  });
+  app.post('/api/auth/logout', async (c: HonoContext) => {
+    const sessionId = c.get('sessionId');
+    if (sessionId) {
+      await SessionEntity.delete(c.env, sessionId);
+    }
+    return ok(c, { success: true });
   });
   app.get('/api/auth/me', async (c: HonoContext) => {
     const user = c.get('user');
     if (!user) throw unauthorized();
-    const { password_hash, ...userWithoutPassword } = user;
-    return ok(c, userWithoutPassword);
+    const { password_hash, ...safeUser } = user;
+    return ok(c, safeUser);
+  });
+  // --- ADMIN: GLOBAL SESSION CLEAR ---
+  app.post('/api/admin/sessions/clear', requireRole(['admin']), async (c: HonoContext) => {
+    const sessions = await SessionEntity.list(c.env, null, 1000);
+    const ids = sessions.items.map(s => s.id);
+    await SessionEntity.deleteMany(c.env, ids);
+    return ok(c, { cleared: ids.length });
   });
   // --- DASHBOARD ---
   app.get('/api/dashboard', async (c: HonoContext) => {
@@ -94,10 +113,9 @@ export function userRoutes(app: HonoApp) {
     return ok(c, {
       summary: data[user.role as keyof typeof data] || data.operator,
       hardwareStatus: { scale: 'connected', camera: 'healthy' },
-      pendingSyncCount: Math.floor(Math.random() * 5),
+      pendingSyncCount: 0,
     });
   });
-  // --- EPR REPORTING (Admin/Auditor) ---
   app.get('/api/epr-report', requireRole(['admin', 'auditor']), async (c: HonoContext) => {
     const [suppliers, ledger, transactions] = await Promise.all([
       SupplierEntity.list(c.env, null, 1000),
@@ -117,94 +135,47 @@ export function userRoutes(app: HonoApp) {
         streams[streamName].fees += t.epr_fee;
       }
     });
-    return ok(c, {
-      compliance_pct,
-      total_fees,
-      pro_xml_mock_hash: 'mock-xml-cert-hash-for-r2-download.xml',
-      streams,
-    });
+    return ok(c, { compliance_pct, total_fees, streams });
   });
-  // --- CONFIGURATION (Admin) ---
   app.get('/api/config/users', requireRole(['admin']), async (c: HonoContext) => {
     const users = (await UserEntity.list(c.env, null, 200)).items;
-    const usersWithoutPasswords = users.map(({ password_hash, ...rest }) => rest);
-    return ok(c, usersWithoutPasswords);
+    return ok(c, users.map(({ password_hash, ...u }) => u));
   });
   app.post('/api/config/users', requireRole(['admin']), async (c: HonoContext) => {
     const updates = await c.req.json<ConfigUserUpdate[]>();
-    if (!Array.isArray(updates)) return bad(c, 'Request body must be an array of user updates.');
-    const results = await Promise.all(updates.map(async (update) => {
-      try {
-        const userEntity = new UserEntity(c.env, update.id);
-        await userEntity.mutate(currentUser => ({
-          ...currentUser,
-          role: update.role,
-          active: update.active ?? currentUser.active,
-          features: update.features ?? currentUser.features ?? [],
-        }));
-        return { id: update.id, success: true };
-      } catch (e) {
-        return { id: update.id, success: false, error: e instanceof Error ? e.message : 'Update failed' };
-      }
-    }));
-    return ok(c, results);
+    for (const update of updates) {
+      const inst = new UserEntity(c.env, update.id);
+      await inst.mutate(curr => ({ ...curr, role: update.role, active: update.active, features: update.features }));
+    }
+    return ok(c, { success: true });
   });
-  // --- MONITORING (Admin) ---
-  app.get('/api/monitor', requireRole(['admin']), async (c: HonoContext) => {
-    const pendingMock = Math.floor(Math.random() * 10);
-    const userCount = (await UserEntity.list(c.env, null, 1000)).items.length;
-    return ok(c, {
-      queueDepth: pendingMock,
-      syncPending: pendingMock,
-      users: userCount,
-    });
-  });
-  // --- Standard CRUD Routes ---
-  app.get('/api/suppliers', async (c: HonoContext) => { await SupplierEntity.ensureSeed(c.env); return ok(c, (await SupplierEntity.list(c.env, null, 100)).items); });
+  app.get('/api/suppliers', async (c: HonoContext) => ok(c, (await SupplierEntity.list(c.env, null, 100)).items));
   app.post('/api/suppliers', requireRole(['admin', 'manager']), async (c: HonoContext) => {
     const body = await c.req.json<Partial<Supplier>>();
-    if (!body.name?.trim()) return bad(c, 'Supplier name is required');
-    const newSupplier: Supplier = { id: crypto.randomUUID(), name: body.name.trim(), contact_person: body.contact_person, phone_number: body.phone_number, email: body.email, address: body.address, epr_number: body.epr_number, is_weee_compliant: body.is_weee_compliant ?? false, created_at: Date.now(), updated_at: Date.now() };
-    return ok(c, await SupplierEntity.create(c.env, newSupplier));
+    const s: Supplier = { id: crypto.randomUUID(), name: body.name || "Unnamed", is_weee_compliant: body.is_weee_compliant || false, created_at: Date.now(), updated_at: Date.now(), ...body };
+    return ok(c, await SupplierEntity.create(c.env, s));
   });
-  app.delete('/api/suppliers/:id', requireRole(['admin', 'manager']), async (c: HonoContext) => ok(c, { id: c.req.param('id'), deleted: await SupplierEntity.delete(c.env, c.req.param('id')) }));
-  app.get('/api/ledger', async (c: HonoContext) => { await InventoryLedgerEntity.ensureSeed(c.env); return ok(c, (await InventoryLedgerEntity.list(c.env, null, 200)).items); });
+  app.get('/api/ledger', async (c: HonoContext) => ok(c, (await InventoryLedgerEntity.list(c.env, null, 200)).items));
   app.post('/api/ledger', async (c: HonoContext) => {
     const body = await c.req.json<Partial<InventoryLedgerEntry>>();
-    if (!body.supplier_id || !body.material_type || !body.weight_kg) return bad(c, 'supplier_id, material_type, and weight_kg are required');
-    const newEntry: InventoryLedgerEntry = { id: body.id || crypto.randomUUID(), supplier_id: body.supplier_id, material_type: body.material_type, weight_kg: body.weight_kg, capture_timestamp: body.capture_timestamp || Date.now(), is_synced: true, created_at: Date.now(), notes: body.notes };
-    return ok(c, await InventoryLedgerEntity.create(c.env, newEntry));
+    const entry: InventoryLedgerEntry = { id: crypto.randomUUID(), supplier_id: body.supplier_id || "", material_type: body.material_type || "", weight_kg: body.weight_kg || 0, capture_timestamp: Date.now(), is_synced: true, created_at: Date.now(), ...body };
+    return ok(c, await InventoryLedgerEntity.create(c.env, entry));
   });
-  app.get('/api/transactions', async (c: HonoContext) => { await TransactionEntity.ensureSeed(c.env); return ok(c, (await TransactionEntity.list(c.env, null, 200)).items); });
+  app.get('/api/transactions', async (c: HonoContext) => ok(c, (await TransactionEntity.list(c.env, null, 200)).items));
   app.post('/api/transactions', async (c: HonoContext) => {
     const body = await c.req.json<Partial<Transaction>>();
-    if (!body.ledger_entry_id || body.amount == null) return bad(c, 'ledger_entry_id and amount are required');
-    const newTransaction: Transaction = { id: body.id || crypto.randomUUID(), ledger_entry_id: body.ledger_entry_id, amount: body.amount, currency: body.currency || 'ZAR', payment_method: body.payment_method, transaction_timestamp: body.transaction_timestamp || Date.now(), epr_fee: body.epr_fee || 0, is_synced: true, created_at: Date.now() };
-    return ok(c, await TransactionEntity.create(c.env, newTransaction));
+    const t: Transaction = { id: crypto.randomUUID(), ledger_entry_id: body.ledger_entry_id || "", amount: body.amount || 0, currency: "ZAR", transaction_timestamp: Date.now(), epr_fee: body.epr_fee || 0, is_synced: true, created_at: Date.now(), ...body };
+    return ok(c, await TransactionEntity.create(c.env, t));
   });
-  // --- OFFLINE SYNC ---
   app.post('/api/sync/ledger', async (c: HonoContext) => {
     const { pendingEntries } = await c.req.json<{ pendingEntries: InventoryLedgerEntry[] }>();
-    if (!Array.isArray(pendingEntries) || pendingEntries.length === 0) return bad(c, 'pendingEntries must be a non-empty array');
-    const results = await Promise.all(pendingEntries.map(async entry => {
-      try { await InventoryLedgerEntity.create(c.env, { ...entry, is_synced: true }); return { id: entry.id, success: true }; }
-      catch (e) { return { id: entry.id, success: false, error: e instanceof Error ? e.message : 'Unknown error' }; }
-    }));
-    return ok(c, { syncedIds: results.filter(r => r.success).map(r => r.id), errors: results.filter(r => !r.success) });
+    for (const e of pendingEntries) await InventoryLedgerEntity.create(c.env, { ...e, is_synced: true });
+    return ok(c, { syncedIds: pendingEntries.map(e => e.id) });
   });
   app.post('/api/sync/transactions', async (c: HonoContext) => {
     const { pendingTransactions } = await c.req.json<{ pendingTransactions: Transaction[] }>();
-    if (!Array.isArray(pendingTransactions) || pendingTransactions.length === 0) return bad(c, 'pendingTransactions must be a non-empty array');
-    const results = await Promise.all(pendingTransactions.map(async tx => {
-      try { await TransactionEntity.create(c.env, { ...tx, is_synced: true }); return { id: tx.id, success: true }; }
-      catch (e) { return { id: tx.id, success: false, error: e instanceof Error ? e.message : 'Unknown error' }; }
-    }));
-    return ok(c, { syncedIds: results.filter(r => r.success).map(r => r.id), errors: results.filter(r => !r.success) });
+    for (const t of pendingTransactions) await TransactionEntity.create(c.env, { ...t, is_synced: true });
+    return ok(c, { syncedIds: pendingTransactions.map(t => t.id) });
   });
-  // --- HARDWARE MOCKS ---
-  app.get('/api/camera/snapshot', async (c: HonoContext) => {
-    const randomId = Math.floor(Math.random() * 1000);
-    const imageUrl = `https://images.unsplash.com/photo-1581092919546-23c1c35a828d?q=80&w=800&auto=format&fit=crop&ixid=${randomId}`;
-    return ok(c, { imageUrl });
-  });
+  app.get('/api/camera/snapshot', async (c: HonoContext) => ok(c, { imageUrl: `https://images.unsplash.com/photo-1581092919546-23c1c35a828d?q=80&w=800&auto=format&fit=crop&ixid=${Math.random()}` }));
 }

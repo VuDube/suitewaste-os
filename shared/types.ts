@@ -14,6 +14,11 @@ export interface User {
   features?: string[];
   created_at: number; // epoch millis
 }
+export interface Session {
+  id: string;
+  userId: string;
+  createdAt: number;
+}
 export interface Supplier {
   id: string;
   name: string;

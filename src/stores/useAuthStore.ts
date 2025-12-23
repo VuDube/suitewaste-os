@@ -28,6 +28,8 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         localStorage.removeItem('token');
         set({ user: null, token: null, isAuthenticated: false });
+        // Prevent back navigation to authenticated pages
+        window.history.replaceState(null, '', '/login');
       },
       setUser: (user) => set({ user, isAuthenticated: !!user }),
     }),
