@@ -96,14 +96,14 @@ export function userRoutes(app: HonoApp) {
       InventoryLedgerEntity.list(c.env, null, 500),
       TransactionEntity.list(c.env, null, 500),
     ]);
-    const recentSuppliers = suppliersPage.items.sort((a, b) => b.created_at - a.created_at).slice(0, 5);
-    const recentLedger = ledgerPage.items.sort((a, b) => b.capture_timestamp - a.capture_timestamp).slice(0, 5);
-    const recentTransactions = transactionsPage.items.sort((a, b) => b.transaction_timestamp - a.transaction_timestamp).slice(0, 5);
-    const totalWeight = ledgerPage.items.reduce((sum, item) => sum + item.weight_kg, 0);
-    const totalValue = transactionsPage.items.reduce((sum, item) => sum + item.amount, 0);
-    const totalEPR = transactionsPage.items.reduce((sum, item) => sum + item.epr_fee, 0);
-    const weeeCompliantCount = suppliersPage.items.filter(s => s.is_weee_compliant).length;
-    const weeePct = suppliersPage.items.length > 0 ? (weeeCompliantCount / suppliersPage.items.length) * 100 : 0;
+    const recentSuppliers = (suppliersPage.items || []).sort((a, b) => b.created_at - a.created_at).slice(0, 5);
+    const recentLedger = (ledgerPage.items || []).sort((a, b) => b.capture_timestamp - a.capture_timestamp).slice(0, 5);
+    const recentTransactions = (transactionsPage.items || []).sort((a, b) => b.transaction_timestamp - a.transaction_timestamp).slice(0, 5);
+    const totalWeight = (ledgerPage.items || []).reduce((sum, item) => sum + item.weight_kg, 0);
+    const totalValue = (transactionsPage.items || []).reduce((sum, item) => sum + item.amount, 0);
+    const totalEPR = (transactionsPage.items || []).reduce((sum, item) => sum + item.epr_fee, 0);
+    const weeeCompliantCount = (suppliersPage.items || []).filter(s => s.is_weee_compliant).length;
+    const weeePct = (suppliersPage.items?.length || 0) > 0 ? (weeeCompliantCount / suppliersPage.items.length) * 100 : 0;
     const data = {
       operator: { recentTransactions, recentLedger },
       manager: { totalWeight, totalValue, totalEPR, recentSuppliers, recentLedger },
@@ -122,11 +122,14 @@ export function userRoutes(app: HonoApp) {
       InventoryLedgerEntity.list(c.env, null, 1000),
       TransactionEntity.list(c.env, null, 1000),
     ]);
-    const compliance_pct = suppliers.items.length > 0 ? (suppliers.items.filter(s => s.is_weee_compliant).length / suppliers.items.length) * 100 : 0;
-    const total_fees = transactions.items.reduce((sum, t) => sum + t.epr_fee, 0);
+    const supplierItems = suppliers.items || [];
+    const ledgerItems = ledger.items || [];
+    const transactionItems = transactions.items || [];
+    const compliance_pct = supplierItems.length > 0 ? (supplierItems.filter(s => s.is_weee_compliant).length / supplierItems.length) * 100 : 0;
+    const total_fees = transactionItems.reduce((sum, t) => sum + t.epr_fee, 0);
     const streams: { [key: string]: { weight: number; fees: number } } = {};
-    const ledgerMap = new Map(ledger.items.map(l => [l.id, l]));
-    transactions.items.forEach(t => {
+    const ledgerMap = new Map(ledgerItems.map(l => [l.id, l]));
+    transactionItems.forEach(t => {
       const ledgerEntry = ledgerMap.get(t.ledger_entry_id);
       if (ledgerEntry) {
         const streamName = getEprStream(ledgerEntry.material_type);
@@ -138,7 +141,7 @@ export function userRoutes(app: HonoApp) {
     return ok(c, { compliance_pct, total_fees, streams });
   });
   app.get('/api/config/users', requireRole(['admin']), async (c: HonoContext) => {
-    const users = (await UserEntity.list(c.env, null, 200)).items;
+    const users = (await UserEntity.list(c.env, null, 200)).items || [];
     return ok(c, users.map(({ password_hash, ...u }) => u));
   });
   app.post('/api/config/users', requireRole(['admin']), async (c: HonoContext) => {
@@ -149,33 +152,68 @@ export function userRoutes(app: HonoApp) {
     }
     return ok(c, { success: true });
   });
-  app.get('/api/suppliers', async (c: HonoContext) => ok(c, (await SupplierEntity.list(c.env, null, 100)).items));
+  app.get('/api/suppliers', async (c: HonoContext) => ok(c, (await SupplierEntity.list(c.env, null, 100)).items || []));
   app.post('/api/suppliers', requireRole(['admin', 'manager']), async (c: HonoContext) => {
     const body = await c.req.json<Partial<Supplier>>();
-    const s: Supplier = { id: crypto.randomUUID(), name: body.name || "Unnamed", is_weee_compliant: body.is_weee_compliant || false, created_at: Date.now(), updated_at: Date.now(), ...body };
+    const s: Supplier = {
+      id: crypto.randomUUID(),
+      name: body.name || "Unnamed",
+      is_weee_compliant: body.is_weee_compliant || false,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      ...body
+    };
     return ok(c, await SupplierEntity.create(c.env, s));
   });
-  app.get('/api/ledger', async (c: HonoContext) => ok(c, (await InventoryLedgerEntity.list(c.env, null, 200)).items));
+  app.delete('/api/suppliers/:id', requireRole(['admin', 'manager']), async (c: HonoContext) => {
+    const id = c.req.param('id');
+    const existed = await SupplierEntity.delete(c.env, id);
+    return ok(c, { id, deleted: existed });
+  });
+  app.get('/api/ledger', async (c: HonoContext) => ok(c, (await InventoryLedgerEntity.list(c.env, null, 200)).items || []));
   app.post('/api/ledger', async (c: HonoContext) => {
     const body = await c.req.json<Partial<InventoryLedgerEntry>>();
-    const entry: InventoryLedgerEntry = { id: crypto.randomUUID(), supplier_id: body.supplier_id || "", material_type: body.material_type || "", weight_kg: body.weight_kg || 0, capture_timestamp: Date.now(), is_synced: true, created_at: Date.now(), ...body };
+    const entry: InventoryLedgerEntry = {
+      id: crypto.randomUUID(),
+      supplier_id: body.supplier_id || "",
+      material_type: body.material_type || "",
+      weight_kg: body.weight_kg || 0,
+      capture_timestamp: Date.now(),
+      is_synced: true,
+      created_at: Date.now(),
+      ...body
+    };
     return ok(c, await InventoryLedgerEntity.create(c.env, entry));
   });
-  app.get('/api/transactions', async (c: HonoContext) => ok(c, (await TransactionEntity.list(c.env, null, 200)).items));
+  app.get('/api/transactions', async (c: HonoContext) => ok(c, (await TransactionEntity.list(c.env, null, 200)).items || []));
   app.post('/api/transactions', async (c: HonoContext) => {
     const body = await c.req.json<Partial<Transaction>>();
-    const t: Transaction = { id: crypto.randomUUID(), ledger_entry_id: body.ledger_entry_id || "", amount: body.amount || 0, currency: "ZAR", transaction_timestamp: Date.now(), epr_fee: body.epr_fee || 0, is_synced: true, created_at: Date.now(), ...body };
+    const t: Transaction = {
+      id: crypto.randomUUID(),
+      ledger_entry_id: body.ledger_entry_id || "",
+      amount: body.amount || 0,
+      currency: "ZAR",
+      transaction_timestamp: Date.now(),
+      epr_fee: body.epr_fee || 0,
+      is_synced: true,
+      created_at: Date.now(),
+      ...body
+    };
     return ok(c, await TransactionEntity.create(c.env, t));
   });
   app.post('/api/sync/ledger', async (c: HonoContext) => {
     const { pendingEntries } = await c.req.json<{ pendingEntries: InventoryLedgerEntry[] }>();
-    for (const e of pendingEntries) await InventoryLedgerEntity.create(c.env, { ...e, is_synced: true });
-    return ok(c, { syncedIds: pendingEntries.map(e => e.id) });
+    if (pendingEntries) {
+      for (const e of pendingEntries) await InventoryLedgerEntity.create(c.env, { ...e, is_synced: true });
+    }
+    return ok(c, { syncedIds: (pendingEntries || []).map(e => e.id) });
   });
   app.post('/api/sync/transactions', async (c: HonoContext) => {
     const { pendingTransactions } = await c.req.json<{ pendingTransactions: Transaction[] }>();
-    for (const t of pendingTransactions) await TransactionEntity.create(c.env, { ...t, is_synced: true });
-    return ok(c, { syncedIds: pendingTransactions.map(t => t.id) });
+    if (pendingTransactions) {
+      for (const t of pendingTransactions) await TransactionEntity.create(c.env, { ...t, is_synced: true });
+    }
+    return ok(c, { syncedIds: (pendingTransactions || []).map(t => t.id) });
   });
   app.get('/api/camera/snapshot', async (c: HonoContext) => ok(c, { imageUrl: `https://images.unsplash.com/photo-1581092919546-23c1c35a828d?q=80&w=800&auto=format&fit=crop&ixid=${Math.random()}` }));
 }
