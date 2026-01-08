@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import { HardHat, Menu, LayoutDashboard, Weight, Users, BookOpen, Settings2, LogOut, FileText, MessageCircle, ShieldCheck } from 'lucide-react';
+import { HardHat, Menu, LayoutDashboard, Weight, Users, BookOpen, Settings2, LogOut, FileText, MessageCircle, ShieldCheck, Landmark, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -16,6 +16,8 @@ const navItems = [
   { href: '/suppliers', label: 'Suppliers', icon: Users, roles: ['manager', 'admin'] },
   { href: '/ledger', label: 'Ledger', icon: BookOpen, roles: ['manager', 'admin', 'auditor'] },
   { href: '/transactions', label: 'Transactions', icon: FileText, roles: ['manager', 'admin', 'auditor'] },
+  { href: '/finance', label: 'Finance', icon: Landmark, roles: ['manager', 'admin', 'auditor'] },
+  { href: '/staff', label: 'Staff', icon: Briefcase, roles: ['manager', 'admin'] },
   { href: '/audit', label: 'Audit Log', icon: ShieldCheck, roles: ['admin', 'auditor'] },
   { href: '/chat', label: 'Chat', icon: MessageCircle, roles: ['operator','manager','admin','auditor'], features: ['chat-access'] },
   { href: '/hardware', label: 'Hardware', icon: Settings2, roles: ['admin'] },

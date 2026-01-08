@@ -1,5 +1,25 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
+// Define Web Serial types for the hook
+type SerialPortRequestOptions = {
+  filters?: { usbVendorId?: number; usbProductId?: number }[];
+};
+type SerialPort = EventTarget & {
+  open(options: { baudRate: number }): Promise<void>;
+  close(): Promise<void>;
+  readable: ReadableStream<Uint8Array> | null;
+  writable: WritableStream<Uint8Array> | null;
+  addEventListener(type: 'disconnect', listener: (ev: Event) => any, options?: boolean | AddEventListenerOptions): void;
+  removeEventListener(type: 'disconnect', listener: (ev: Event) => any, options?: boolean | EventListenerOptions): void;
+};
+declare global {
+  interface Navigator {
+    serial: {
+      requestPort(options?: SerialPortRequestOptions): Promise<SerialPort>;
+      getPorts(): Promise<SerialPort[]>;
+    };
+  }
+}
 type ScaleStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'parsing' | 'failover';
 interface DeviceHealth {
   id: string;
@@ -60,7 +80,6 @@ export function useMultiScale() {
       readerRef.current = reader;
       const decoder = new TextDecoder();
       let buffer = '';
-      // Register initial device health state
       setDevices([{ id: 'main-scale', name: 'Primary Scale', status: 'connected', lastSeen: Date.now() }]);
       while (keepReadingRef.current) {
         const { value, done } = await reader.read();
@@ -68,16 +87,14 @@ export function useMultiScale() {
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split(/[\r\n]+/);
         if (lines.length > 1) {
-          // Process the last complete line
           const completeLine = lines[lines.length - 2];
           const match = completeLine.match(WEIGHT_REGEX);
           if (match && match[1]) {
             const parsedWeight = parseFloat(match[1]);
             setWeight(parsedWeight);
-            // Update health heartbeat
-            setDevices(prev => prev.map(d => 
-              d.id === 'main-scale' 
-                ? { ...d, lastSeen: Date.now(), status: 'parsing' as ScaleStatus } 
+            setDevices(prev => prev.map(d =>
+              d.id === 'main-scale'
+                ? { ...d, lastSeen: Date.now(), status: 'parsing' as ScaleStatus }
                 : d
             ));
           }

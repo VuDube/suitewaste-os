@@ -18,6 +18,8 @@ import { Login } from '@/pages/Login';
 import { AuditLog } from '@/pages/AuditLog';
 import { Settings } from '@/pages/Settings';
 import { Chat } from '@/pages/Chat';
+import { StaffManager } from '@/pages/StaffManager';
+import { FinanceLedger } from '@/pages/FinanceLedger';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -32,7 +34,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-// Safeguard global exposure for offline store revalidation
 if (typeof window !== 'undefined') {
   (window as any).queryClient = queryClient;
 }
@@ -43,12 +44,13 @@ const router = createBrowserRouter([
   { path: "/suppliers", element: <SupplierDirectory />, errorElement: <RouteErrorBoundary /> },
   { path: "/ledger", element: <InventoryLedger />, errorElement: <RouteErrorBoundary /> },
   { path: "/transactions", element: <Transactions />, errorElement: <RouteErrorBoundary /> },
+  { path: "/finance", element: <FinanceLedger />, errorElement: <RouteErrorBoundary /> },
+  { path: "/staff", element: <StaffManager />, errorElement: <RouteErrorBoundary /> },
   { path: "/hardware", element: <HardwareIntegrations />, errorElement: <RouteErrorBoundary /> },
   { path: "/audit", element: <AuditLog />, errorElement: <RouteErrorBoundary /> },
   { path: "/settings", element: <Settings />, errorElement: <RouteErrorBoundary /> },
   { path: "/chat", element: <Chat />, errorElement: <RouteErrorBoundary /> },
 ]);
-// PWA Service Worker Registration with production checks
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     if (import.meta.env.DEV) return;
