@@ -84,7 +84,8 @@ function runSetupCommands() {
     "bun add workbox-window",
     "bun add bcryptjs jsonwebtoken pdfmake leaflet",
     "bun add idb-keyval@^6.2.1",
-    "bun add tslib@^2.6.3"
+    "bun add tslib@^2.6.3",
+    "bun add @types/jsonwebtoken -d"
 ];
     
     if (commands.length === 0) {
