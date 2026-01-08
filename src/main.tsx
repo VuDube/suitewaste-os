@@ -20,6 +20,9 @@ import { Settings } from '@/pages/Settings';
 import { Chat } from '@/pages/Chat';
 import { StaffManager } from '@/pages/StaffManager';
 import { FinanceLedger } from '@/pages/FinanceLedger';
+import { FleetPortal } from '@/pages/FleetPortal';
+import { BuyerPortal } from '@/pages/BuyerPortal';
+import { ProducerPortal } from '@/pages/ProducerPortal';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -46,6 +49,9 @@ const router = createBrowserRouter([
   { path: "/transactions", element: <Transactions />, errorElement: <RouteErrorBoundary /> },
   { path: "/finance", element: <FinanceLedger />, errorElement: <RouteErrorBoundary /> },
   { path: "/staff", element: <StaffManager />, errorElement: <RouteErrorBoundary /> },
+  { path: "/fleet", element: <FleetPortal />, errorElement: <RouteErrorBoundary /> },
+  { path: "/marketplace", element: <BuyerPortal />, errorElement: <RouteErrorBoundary /> },
+  { path: "/producer-portal", element: <ProducerPortal />, errorElement: <RouteErrorBoundary /> },
   { path: "/hardware", element: <HardwareIntegrations />, errorElement: <RouteErrorBoundary /> },
   { path: "/audit", element: <AuditLog />, errorElement: <RouteErrorBoundary /> },
   { path: "/settings", element: <Settings />, errorElement: <RouteErrorBoundary /> },
@@ -55,12 +61,8 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     if (import.meta.env.DEV) return;
     navigator.serviceWorker.register('/sw.js').then(
-      (registration) => {
-        console.log('SW registered:', registration.scope);
-      },
-      (err) => {
-        console.error('SW registration failed:', err);
-      }
+      (registration) => { console.log('SW registered:', registration.scope); },
+      (err) => { console.error('SW registration failed:', err); }
     );
   });
 }

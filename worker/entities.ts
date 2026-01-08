@@ -1,5 +1,9 @@
 import { IndexedEntity, type Env } from "./core-utils";
-import type { Supplier, InventoryLedgerEntry, Transaction, User, Session, AuditLog, StaffMember, GLAccount, GLEntry } from "@shared/types";
+import type { 
+  Supplier, InventoryLedgerEntry, Transaction, User, Session, AuditLog, 
+  StaffMember, GLAccount, GLEntry, Vehicle, CollectionRoute, 
+  MarketplaceOrder, ProducerDisposalRequest, Timesheet 
+} from "@shared/types";
 import { MOCK_SUPPLIERS, MOCK_INVENTORY_LEDGER, MOCK_TRANSACTIONS, MOCK_USERS } from "@shared/mock-data";
 export class SessionEntity extends IndexedEntity<Session> {
   static readonly entityName = "session";
@@ -35,6 +39,35 @@ export class StaffEntity extends IndexedEntity<StaffMember> {
   static readonly indexName = "staff_members";
   static readonly initialState: StaffMember = { id: "", name: "", pin: "", role: "operator", clock_status: "out", last_seen: 0 };
 }
+export class VehicleEntity extends IndexedEntity<Vehicle> {
+  static readonly entityName = "vehicle";
+  static readonly indexName = "vehicles";
+  static readonly initialState: Vehicle = { id: "", registration: "", model: "", status: "idle", capacity_kg: 0, last_service: 0 };
+  static seedData = [
+    { id: "v-001", registration: "CA 123-456", model: "Isuzu NPR 400", status: "active", capacity_kg: 4000, last_service: Date.now() },
+    { id: "v-002", registration: "GP 987-654", model: "Hino 300", status: "idle", capacity_kg: 3000, last_service: Date.now() }
+  ];
+}
+export class RouteEntity extends IndexedEntity<CollectionRoute> {
+  static readonly entityName = "route";
+  static readonly indexName = "routes";
+  static readonly initialState: CollectionRoute = { id: "", vehicle_id: "", driver_id: "", stops: [], status: "pending", assigned_date: 0 };
+}
+export class OrderEntity extends IndexedEntity<MarketplaceOrder> {
+  static readonly entityName = "order";
+  static readonly indexName = "orders";
+  static readonly initialState: MarketplaceOrder = { id: "", buyer_id: "", material_lot_id: "", weight_kg: 0, price_zar: 0, status: "open", created_at: 0 };
+}
+export class ProducerRequestEntity extends IndexedEntity<ProducerDisposalRequest> {
+  static readonly entityName = "producer_request";
+  static readonly indexName = "producer_requests";
+  static readonly initialState: ProducerDisposalRequest = { id: "", producer_name: "", material_type: "", estimated_weight: 0, status: "requested", request_date: 0 };
+}
+export class TimesheetEntity extends IndexedEntity<Timesheet> {
+  static readonly entityName = "timesheet";
+  static readonly indexName = "timesheets";
+  static readonly initialState: Timesheet = { id: "", staff_id: "", clock_in: 0 };
+}
 export class GLAccountEntity extends IndexedEntity<GLAccount> {
   static readonly entityName = "gl_account";
   static readonly indexName = "gl_accounts";
@@ -60,7 +93,6 @@ export class AuditLogEntity extends IndexedEntity<AuditLog> {
       if (log.previous_hash !== prevHash) {
         return { verified: false, totalChecked: sorted.indexOf(log), reason: "Hash linkage failure", blockId: log.id };
       }
-      // In a real env, we'd re-compute the SHA256(timestamp|actor|action|details|prevHash) here
       prevHash = log.payload_hash;
     }
     return { verified: true, totalChecked: sorted.length };

@@ -15,7 +15,7 @@ export interface User {
   username: string;
   email?: string;
   password_hash: string;
-  role: 'operator' | 'manager' | 'admin' | 'auditor';
+  role: 'operator' | 'manager' | 'admin' | 'auditor' | 'buyer' | 'producer';
   active: boolean;
   features?: string[];
   created_at: number;
@@ -71,6 +71,47 @@ export interface StaffMember {
   last_seen: number;
   features?: string[];
 }
+export interface Vehicle {
+  id: string;
+  registration: string;
+  model: string;
+  status: 'active' | 'maintenance' | 'idle';
+  capacity_kg: number;
+  last_service: number;
+}
+export interface CollectionRoute {
+  id: string;
+  vehicle_id: string;
+  driver_id: string;
+  stops: string[];
+  status: 'pending' | 'in-progress' | 'completed';
+  assigned_date: number;
+}
+export interface MarketplaceOrder {
+  id: string;
+  buyer_id: string;
+  material_lot_id: string;
+  weight_kg: number;
+  price_zar: number;
+  status: 'open' | 'paid' | 'shipped';
+  epr_cert_hash?: string;
+  created_at: number;
+}
+export interface ProducerDisposalRequest {
+  id: string;
+  producer_name: string;
+  material_type: string;
+  estimated_weight: number;
+  status: 'requested' | 'scheduled' | 'collected';
+  request_date: number;
+}
+export interface Timesheet {
+  id: string;
+  staff_id: string;
+  clock_in: number;
+  clock_out?: number;
+  location_gps?: string;
+}
 export interface GLAccount {
   id: string;
   code: string;
@@ -87,31 +128,21 @@ export interface GLEntry {
   description: string;
   timestamp: number;
 }
-export interface FinanceSummary {
-  net_amount: number;
-  vat_amount: number;
-  gross_amount: number;
-  currency: 'ZAR';
-}
 export interface AuditLog {
   id: string;
   entity_id: string;
-  entity_type: 'supplier' | 'ledger' | 'transaction' | 'user' | 'system' | 'staff' | 'finance';
-  action: 'create' | 'update' | 'delete' | 'login' | 'verify' | 'clock-in' | 'clock-out';
+  entity_type: 'supplier' | 'ledger' | 'transaction' | 'user' | 'system' | 'staff' | 'finance' | 'fleet' | 'marketplace' | 'producer';
+  action: 'create' | 'update' | 'delete' | 'login' | 'verify' | 'clock-in' | 'clock-out' | 'dispatch' | 'complete';
   actor_id: string;
   timestamp: number;
   payload_hash: string;
   previous_hash: string;
   details?: string;
 }
-export interface EPRStreamData {
-  weight: number;
-  fees: number;
-}
 export interface EPRReport {
   compliance_pct: number;
   total_fees: number;
   audit_chain_status: 'verified' | 'tampered' | 'pending';
-  streams: Record<WasteStreamType, EPRStreamData>;
+  streams: Record<WasteStreamType, { weight: number; fees: number }>;
 }
 export type ConfigUserUpdate = Pick<User, 'id' | 'role' | 'active' | 'features'>;

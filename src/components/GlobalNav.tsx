@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import { HardHat, Menu, LayoutDashboard, Weight, Users, BookOpen, Settings2, LogOut, FileText, MessageCircle, ShieldCheck, Landmark, Briefcase } from 'lucide-react';
+import { HardHat, Menu, LayoutDashboard, Weight, Users, BookOpen, Settings2, LogOut, FileText, MessageCircle, ShieldCheck, Landmark, Briefcase, Truck, ShoppingCart, Factory } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -11,12 +11,15 @@ import { api } from '@/lib/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'manager', 'admin', 'auditor'] },
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['operator', 'manager', 'admin', 'auditor', 'buyer', 'producer'] },
   { href: '/quick-weight', label: 'Weigh', icon: Weight, roles: ['operator', 'manager', 'admin'] },
   { href: '/suppliers', label: 'Suppliers', icon: Users, roles: ['manager', 'admin'] },
   { href: '/ledger', label: 'Ledger', icon: BookOpen, roles: ['manager', 'admin', 'auditor'] },
   { href: '/transactions', label: 'Transactions', icon: FileText, roles: ['manager', 'admin', 'auditor'] },
   { href: '/finance', label: 'Finance', icon: Landmark, roles: ['manager', 'admin', 'auditor'] },
+  { href: '/fleet', label: 'Fleet', icon: Truck, roles: ['manager', 'admin'], features: ['fleet-management'] },
+  { href: '/marketplace', label: 'Marketplace', icon: ShoppingCart, roles: ['buyer', 'admin'] },
+  { href: '/producer-portal', label: 'Producer', icon: Factory, roles: ['producer', 'admin'] },
   { href: '/staff', label: 'Staff', icon: Briefcase, roles: ['manager', 'admin'] },
   { href: '/audit', label: 'Audit Log', icon: ShieldCheck, roles: ['admin', 'auditor'] },
   { href: '/chat', label: 'Chat', icon: MessageCircle, roles: ['operator','manager','admin','auditor'], features: ['chat-access'] },

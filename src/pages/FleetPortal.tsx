@@ -1,30 +1,17 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PageLayout } from '@/components/PageLayout';
-import { EnterpriseMap } from '@/components/EnterpriseMap';
 import { api } from '@/lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Truck, MapPin, Wrench, Activity, Loader2, Navigation, Send, ShieldAlert, Zap, Fuel } from 'lucide-react';
+import { Truck, MapPin, Tool, Activity, Loader2, Navigation } from 'lucide-react';
 import type { Vehicle, CollectionRoute } from '@shared/types';
 import { motion } from 'framer-motion';
-import { toast } from 'sonner';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 export function FleetPortal() {
-  const queryClient = useQueryClient();
-  const [safeMode, setSafeMode] = useState(true);
   const { data: vehicles, isLoading: vLoading } = useQuery({ queryKey: ['vehicles'], queryFn: () => api<Vehicle[]>('/api/fleet/vehicles') });
   const { data: routes, isLoading: rLoading } = useQuery({ queryKey: ['routes'], queryFn: () => api<CollectionRoute[]>('/api/fleet/routes') });
-  const dispatchMutation = useMutation({
-    mutationFn: (id: string) => api(`/api/fleet/routes/${id}/dispatch`, { method: 'POST' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['routes'] });
-      toast.success("Logistics Dispatch Finalized");
-    }
-  });
   if (vLoading || rLoading) {
     return (
       <PageLayout>
@@ -35,86 +22,87 @@ export function FleetPortal() {
   return (
     <PageLayout>
       <div className="space-y-10 max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-4xl font-black uppercase tracking-tighter">Fleet Command</h1>
-            <p className="text-muted-foreground text-lg italic">Telematics & Crime-Zone Rerouting</p>
-          </div>
-          <div className="flex items-center gap-4 p-4 rounded-2xl bg-surface-variant/50 border border-white/5">
-            <div className="flex items-center space-x-2">
-              <Switch id="safe-mode" checked={safeMode} onCheckedChange={setSafeMode} />
-              <Label htmlFor="safe-mode" className="text-[10px] font-black uppercase tracking-widest">Safe-Route Optimization</Label>
-            </div>
-          </div>
+        <div>
+          <h1 className="text-4xl font-display font-bold tracking-tight">Fleet Command</h1>
+          <p className="text-muted-foreground text-lg">Logistics & route optimization engine.</p>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 space-y-8">
-            <EnterpriseMap className="h-[500px]" />
-            <Card className="glass-panel border-none shadow-elevation-1">
-              <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">Pending Deployments</CardTitle></CardHeader>
-              <CardContent className="p-0">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {vehicles?.map((v, i) => (
+            <motion.div key={v.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
+              <Card className="bg-card/40 border-primary/5 hover:border-primary/20 transition-all group">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <div className="p-2 rounded-lg bg-primary/5 group-hover:bg-primary/20">
+                    <Truck className="h-5 w-5 text-primary" />
+                  </div>
+                  <Badge variant={v.status === 'active' ? 'default' : 'secondary'} className={v.status === 'active' ? 'bg-emerald-600' : ''}>
+                    {v.status}
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold font-mono">{v.registration}</div>
+                  <p className="text-xs text-muted-foreground uppercase font-bold mt-1">{v.model}</p>
+                  <div className="mt-4 flex items-center justify-between text-xs font-bold">
+                    <span>CAPACITY:</span>
+                    <span className="text-primary">{v.capacity_kg}kg</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <Card className="lg:col-span-2 shadow-soft bg-card/60 backdrop-blur-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2"><Navigation className="h-5 w-5 text-primary" /> Live Daily Routes</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto border rounded-xl">
                 <Table>
-                  <TableHeader className="bg-surface-variant/30">
-                    <TableRow className="border-b-white/5">
-                      <TableHead className="px-6 h-14">Vehicle</TableHead>
-                      <TableHead className="px-6 h-14">Nodes</TableHead>
-                      <TableHead className="px-6 h-14 text-right">Action</TableHead>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Route ID</TableHead>
+                      <TableHead>Vehicle</TableHead>
+                      <TableHead>Stops</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {routes?.filter(r => r.status === 'pending').map(r => (
-                      <TableRow key={r.id} className="border-b-white/5 hover:bg-white/5 transition-colors">
-                        <TableCell className="px-6 py-5 font-bold">{vehicles?.find(v => v.id === r.vehicle_id)?.registration}</TableCell>
-                        <TableCell className="px-6 py-5 text-xs font-bold text-muted-foreground">{r.stops.length} Deliveries</TableCell>
-                        <TableCell className="px-6 py-5 text-right">
-                          <Button size="sm" className="h-10 gap-2 font-black uppercase tracking-widest" onClick={() => dispatchMutation.mutate(r.id)}>
-                            <Send className="h-4 w-4" /> Dispatch
-                          </Button>
+                    {routes?.length ? routes.map(r => (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-mono text-xs">{r.id}</TableCell>
+                        <TableCell className="font-bold">{vehicles?.find(v => v.id === r.vehicle_id)?.registration}</TableCell>
+                        <TableCell>
+                          <div className="flex -space-x-1">
+                            {r.stops.map((s, i) => (
+                              <div key={i} className="h-6 w-6 rounded-full bg-accent border-2 border-background flex items-center justify-center text-[10px] font-bold">
+                                {i + 1}
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="uppercase text-[10px]">{r.status}</Badge>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )) : (
+                      <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic">No routes dispatched today.</TableCell></TableRow>
+                    )}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          </div>
-          <aside className="lg:col-span-4 space-y-6">
-            <Card className="bg-card border-none shadow-elevation-3">
-              <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2"><Zap className="h-4 w-4 text-primary" /> Vehicle Vitals</CardTitle></CardHeader>
-              <CardContent className="space-y-6">
-                {vehicles?.map(v => (
-                  <div key={v.id} className="p-4 rounded-xl border border-white/5 bg-surface-variant/20 space-y-3 group hover:bg-surface-variant/40 transition-colors">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-sm tracking-tight">{v.registration}</span>
-                      <Badge variant={v.status === 'active' ? 'default' : 'outline'} className={v.status === 'active' ? 'bg-emerald-600' : ''}>
-                        {v.status.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 space-y-1">
-                        <div className="flex justify-between text-[9px] font-black uppercase text-muted-foreground"><span>Fuel</span><span>{Math.floor(Math.random()*60 + 40)}%</span></div>
-                        <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
-                          <div className="h-full bg-primary" style={{ width: '65%' }} />
-                        </div>
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <div className="flex justify-between text-[9px] font-black uppercase text-muted-foreground"><span>Health</span><span>Optimal</span></div>
-                        <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500" style={{ width: '95%' }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-            <Card className="bg-red-500/10 border border-red-500/20">
-              <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest text-red-500 flex items-center gap-2"><ShieldAlert className="h-4 w-4" /> Security Overlays</CardTitle></CardHeader>
-              <CardContent>
-                <p className="text-xs font-bold leading-relaxed">Safety systems are monitoring 4 critical industrial polygons. Rerouting is enabled for all Isuzu fleet units.</p>
-              </CardContent>
-            </Card>
-          </aside>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/40 border-border">
+            <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> Operational Health</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                <div className="text-xs font-bold text-muted-foreground uppercase mb-1">Fleet Utilization</div>
+                <div className="text-2xl font-bold">84%</div>
+              </div>
+              <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/10">
+                <div className="text-xs font-bold text-muted-foreground uppercase mb-1">Maintenance Alerts</div>
+                <div className="text-2xl font-bold text-orange-500">1 Vehicle</div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </PageLayout>

@@ -1,62 +1,50 @@
 import { Hono } from "hono";
 import type { Context, Next } from 'hono';
-import { 
-  SupplierEntity, 
-  InventoryLedgerEntity, 
-  TransactionEntity, 
-  UserEntity, 
-  SessionEntity, 
-  AuditLogEntity, 
-  StaffEntity, 
-  GLAccountEntity, 
-  GLEntryEntity 
+import { Buffer } from 'buffer';
+(globalThis as any).Buffer = Buffer;
+import {
+  SupplierEntity,
+  InventoryLedgerEntity,
+  TransactionEntity,
+  UserEntity,
+  SessionEntity,
+  AuditLogEntity,
+  StaffEntity,
+  VehicleEntity,
+  RouteEntity,
+  OrderEntity,
+  ProducerRequestEntity,
+  TimesheetEntity
 } from "./entities";
-import { ok, bad, notFound } from './core-utils';
-import type { 
-  InventoryLedgerEntry, 
-  Supplier, 
-  Transaction, 
-  User, 
-  ConfigUserUpdate, 
-  AuditLog, 
-  StaffMember, 
-  WasteStreamType,
-  ApiResponse
+import { ok, bad } from './core-utils';
+import type {
+  InventoryLedgerEntry,
+  Supplier,
+  Transaction,
+  User,
+  ConfigUserUpdate,
+  AuditLog,
+  Vehicle,
+  CollectionRoute,
+  MarketplaceOrder,
+  ProducerDisposalRequest,
+  Timesheet
 } from "@shared/types";
 import { HTTPException } from "hono/http-exception";
-// Note: bcryptjs is avoided in Worker entry due to node:crypto issues in some environments.
-// We assume password verification is handled or mocked for this phase's logic.
 const JWT_SECRET = 'suitewaste-enterprise-v1-secret-key';
-
 function base64urlDecode(str: string): Uint8Array {
   const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
   return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
 }
-
 async function verifyJwt(token: string, secret: string): Promise<any> {
   const [headerB64, payloadB64, sigB64] = token.split('.');
   if (!headerB64 || !payloadB64 || !sigB64) throw new Error('Invalid token');
-  
-  const headerBytes = base64urlDecode(headerB64);
-  const header = JSON.parse(new TextDecoder().decode(headerBytes));
-  if (header.alg !== 'HS256') throw new Error('Unsupported algorithm');
-  
   const data = `${headerB64}.${payloadB64}`;
-  const key = await crypto.subtle.importKey(
-    'raw', 
-    new TextEncoder().encode(secret), 
-    { name: 'HMAC', hash: 'SHA-256' }, 
-    false, 
-    ['verify']
-  );
-  const signature = base64urlDecode(sigB64);
-  const valid = await crypto.subtle.verify('HMAC', key, signature, new TextEncoder().encode(data));
-  
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+  const valid = await crypto.subtle.verify('HMAC', key, base64urlDecode(sigB64), new TextEncoder().encode(data));
   if (!valid) throw new Error('Invalid signature');
-  
-  const payloadBytes = base64urlDecode(payloadB64);
-  return JSON.parse(new TextDecoder().decode(payloadBytes));
+  return JSON.parse(new TextDecoder().decode(base64urlDecode(payloadB64)));
 }
 export interface Env {
   GlobalDurableObject: DurableObjectNamespace<any>;
@@ -104,9 +92,7 @@ export function userRoutes(app: HonoApp) {
       if (!user || !user.id || !user.active) throw unauthorized();
       c.set('user', user);
       c.set('sessionId', decoded.sessionId);
-    } catch (e) {
-      throw unauthorized();
-    }
+    } catch (e) { throw unauthorized(); }
     await next();
   });
   const requireRole = (roles: User['role'][]) => async (c: HonoContext, next: Next) => {
@@ -114,142 +100,57 @@ export function userRoutes(app: HonoApp) {
     if (!user || !roles.includes(user.role)) throw forbidden();
     await next();
   };
-  // --- SUPPLIERS ---
-  app.get('/api/suppliers', async (c) => {
-    const list = await SupplierEntity.list(c.env, null, 1000);
-    return ok(c, list.items);
+  const requireFeature = (feature: string) => async (c: HonoContext, next: Next) => {
+    const user = c.get('user');
+    if (!user || !user.features?.includes(feature)) throw forbidden();
+    await next();
+  };
+  // --- FLEET ---
+  app.get('/api/fleet/vehicles', async (c) => ok(c, (await VehicleEntity.list(c.env, null, 100)).items));
+  app.post('/api/fleet/vehicles', requireRole(['admin', 'manager']), async (c) => {
+    const body = await c.req.json<Vehicle>();
+    const vehicle = await VehicleEntity.create(c.env, { ...body, id: body.id || crypto.randomUUID() });
+    await createAuditRecord(c, { entity_id: vehicle.id, entity_type: 'fleet', action: 'create', payload: vehicle });
+    return ok(c, vehicle);
   });
-  app.post('/api/suppliers', requireRole(['admin', 'manager']), async (c) => {
-    const body = await c.req.json<Omit<Supplier, 'id'>>();
-    const supplier = await SupplierEntity.create(c.env, { 
-      ...body, 
-      id: crypto.randomUUID(), 
-      created_at: Date.now(), 
-      updated_at: Date.now() 
-    } as Supplier);
-    await createAuditRecord(c, { entity_id: supplier.id, entity_type: 'supplier', action: 'create', payload: supplier });
-    return ok(c, supplier);
+  app.get('/api/fleet/routes', async (c) => ok(c, (await RouteEntity.list(c.env, null, 100)).items));
+  // --- MARKETPLACE ---
+  app.get('/api/marketplace/lots', async (c) => {
+    const lots = [
+      { id: 'lot-cu-01', material: 'Copper Grade A', weight_kg: 500, purity: '99.9%', epr_status: 'verified' },
+      { id: 'lot-al-01', material: 'Aluminum Extrusion', weight_kg: 1200, purity: '98%', epr_status: 'verified' },
+      { id: 'lot-pt-01', material: 'PET Clear Flakes', weight_kg: 2500, purity: '95%', epr_status: 'verified' }
+    ];
+    return ok(c, lots);
   });
-  app.delete('/api/suppliers/:id', requireRole(['admin']), async (c) => {
-    const id = c.req.param('id');
-    const deleted = await SupplierEntity.delete(c.env, id);
-    if (deleted) await createAuditRecord(c, { entity_id: id, entity_type: 'supplier', action: 'delete', payload: { id } });
-    return ok(c, { id, deleted });
+  app.post('/api/marketplace/orders', requireRole(['buyer', 'admin']), async (c) => {
+    const body = await c.req.json<MarketplaceOrder>();
+    const order = await OrderEntity.create(c.env, { ...body, id: crypto.randomUUID(), created_at: Date.now() });
+    await createAuditRecord(c, { entity_id: order.id, entity_type: 'marketplace', action: 'create', payload: order });
+    return ok(c, order);
   });
-  // --- LEDGER & TRANSACTIONS ---
-  app.get('/api/ledger', async (c) => {
-    const list = await InventoryLedgerEntity.list(c.env, null, 1000);
-    return ok(c, list.items);
+  // --- PRODUCERS ---
+  app.get('/api/producers/requests', async (c) => ok(c, (await ProducerRequestEntity.list(c.env, null, 100)).items));
+  app.post('/api/producers/requests', async (c) => {
+    const body = await c.req.json<ProducerDisposalRequest>();
+    const request = await ProducerRequestEntity.create(c.env, { ...body, id: crypto.randomUUID(), request_date: Date.now() });
+    return ok(c, request);
   });
-  app.get('/api/transactions', async (c) => {
-    const list = await TransactionEntity.list(c.env, null, 1000);
-    return ok(c, list.items);
+  // --- HR & TIMESHEETS ---
+  app.get('/api/hr/staff', async (c) => ok(c, (await StaffEntity.list(c.env, null, 500)).items));
+  app.post('/api/hr/clock', async (c) => {
+    const { staffId, action } = await c.req.json<{ staffId: string, action: 'in' | 'out' }>();
+    const inst = new StaffEntity(c.env, staffId);
+    const staff = await inst.mutate(s => ({ ...s, clock_status: action, last_seen: Date.now() }));
+    const timesheet = await TimesheetEntity.create(c.env, { id: crypto.randomUUID(), staff_id: staffId, clock_in: Date.now() });
+    return ok(c, { staff, timesheet });
   });
-  // --- SYNC ---
-  app.post('/api/sync/ledger', async (c) => {
-    const { pendingEntries } = await c.req.json<{ pendingEntries: InventoryLedgerEntry[] }>();
-    const syncedIds: string[] = [];
-    for (const entry of pendingEntries) {
-      await InventoryLedgerEntity.create(c.env, { ...entry, is_synced: true });
-      syncedIds.push(entry.id);
-    }
-    return ok(c, { syncedIds });
-  });
-  app.post('/api/sync/transactions', async (c) => {
-    const { pendingTransactions } = await c.req.json<{ pendingTransactions: Transaction[] }>();
-    const syncedIds: string[] = [];
-    for (const tx of pendingTransactions) {
-      await TransactionEntity.create(c.env, { ...tx, is_synced: true });
-      syncedIds.push(tx.id);
-    }
-    return ok(c, { syncedIds });
-  });
-  // --- AUDIT ---
-  app.get('/api/audit', requireRole(['admin', 'auditor']), async (c) => {
-    const cursor = c.req.query('cursor');
-    const logs = await AuditLogEntity.list(c.env, cursor || null, 50);
-    return ok(c, logs);
-  });
-  app.post('/api/audit/verify', requireRole(['admin', 'auditor']), async (c) => {
-    const logs = await AuditLogEntity.list(c.env, null, 1000);
-    const result = await AuditLogEntity.verifyChain(logs.items);
-    return ok(c, result);
-  });
-  // --- EPR REPORT ---
-  app.get('/api/epr-report', requireRole(['admin', 'manager', 'auditor']), async (c) => {
-    const ledger = await InventoryLedgerEntity.list(c.env, null, 2000);
-    const transactions = await TransactionEntity.list(c.env, null, 2000);
-    const streams: Record<WasteStreamType, { weight: number; fees: number }> = {
-      'Plastic': { weight: 0, fees: 0 },
-      'Paper & Packaging': { weight: 0, fees: 0 },
-      'Glass': { weight: 0, fees: 0 },
-      'Metals': { weight: 0, fees: 0 },
-      'Electrical & Electronic': { weight: 0, fees: 0 },
-      'Other': { weight: 0, fees: 0 }
-    };
-    const getStream = (mat: string): WasteStreamType => {
-      const l = mat.toLowerCase();
-      if (l.includes('plastic')) return 'Plastic';
-      if (l.includes('paper') || l.includes('pack')) return 'Paper & Packaging';
-      if (l.includes('glass')) return 'Glass';
-      if (l.includes('metal') || l.includes('copper')) return 'Metals';
-      if (l.includes('elect') || l.includes('weee')) return 'Electrical & Electronic';
-      return 'Other';
-    };
-    ledger.items.forEach(entry => {
-      const stream = getStream(entry.material_type);
-      streams[stream].weight += entry.weight_kg;
-      const tx = transactions.items.find(t => t.ledger_entry_id === entry.id);
-      if (tx) streams[stream].fees += tx.epr_fee;
-    });
-    return ok(c, {
-      compliance_pct: 98.5, // Mocked overall compliance
-      total_fees: Object.values(streams).reduce((s, v) => s + v.fees, 0),
-      audit_chain_status: 'verified',
-      streams
-    });
-  });
-  // --- CONFIG / SETTINGS ---
-  app.get('/api/config/users', requireRole(['admin']), async (c) => {
-    const users = await UserEntity.list(c.env, null, 100);
-    return ok(c, users.items.map(({ password_hash, ...u }) => u));
-  });
-  app.post('/api/config/users', requireRole(['admin']), async (c) => {
-    const updates = await c.req.json<ConfigUserUpdate[]>();
-    for (const update of updates) {
-      const inst = new UserEntity(c.env, update.id);
-      await inst.patch(update);
-    }
-    return ok(c, { updated: updates.length });
-  });
-  // --- CAMERA ---
-  app.get('/api/camera/snapshot', async (c) => {
-    // Industrial placeholder proxy
-    const imageUrl = `https://images.unsplash.com/photo-1530124560676-4fbc912f77c7?auto=format&fit=crop&q=80&w=800`;
-    return ok(c, { imageUrl });
-  });
-  // --- AI CLASSIFY ---
-  app.post('/api/ai/classify', async (c) => {
-    const { material } = await c.req.json<{ material: string }>();
-    let stream: WasteStreamType = 'Other';
-    if (c.env.AI) {
-      try {
-        const response = await c.env.AI.run('@cf/meta/llama-2-7b-chat-int8', {
-          messages: [
-            { role: 'system', content: 'Output one: Plastic, Paper & Packaging, Glass, Metals, Electrical & Electronic, Other.' },
-            { role: 'user', content: material }
-          ]
-        });
-        stream = (response.response?.trim() || 'Other') as WasteStreamType;
-      } catch (e) { console.warn(e); }
-    }
-    return ok(c, { suggestedStream: stream });
-  });
+  // --- CORE DASHBOARD ---
   app.get('/api/dashboard', async (c) => {
     const [suppliers, ledger, transactions] = await Promise.all([
-      SupplierEntity.list(c.env, null, 500),
-      InventoryLedgerEntity.list(c.env, null, 500),
-      TransactionEntity.list(c.env, null, 500),
+      SupplierEntity.list(c.env, null, 100),
+      InventoryLedgerEntity.list(c.env, null, 100),
+      TransactionEntity.list(c.env, null, 100),
     ]);
     return ok(c, {
       summary: {
