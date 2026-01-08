@@ -1,13 +1,16 @@
 import { Hono } from "hono";
 import type { Context, Next } from 'hono';
-import { SupplierEntity, InventoryLedgerEntity, TransactionEntity, UserEntity, SessionEntity, AuditLogEntity } from "./entities";
+import { SupplierEntity, InventoryLedgerEntity, TransactionEntity, UserEntity, SessionEntity, AuditLogEntity, StaffEntity, GLAccountEntity, GLEntryEntity } from "./entities";
 import { ok, bad, notFound } from './core-utils';
-import type { InventoryLedgerEntry, Supplier, Transaction, User, ConfigUserUpdate, Session, AuditLog, StaffMember, GLEntry } from "@shared/types";
+import type { InventoryLedgerEntry, Supplier, Transaction, User, ConfigUserUpdate, Session, AuditLog, StaffMember, GLAccount, WasteStreamType } from "@shared/types";
 import { HTTPException } from "hono/http-exception";
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-const JWT_SECRET = 'suitewaste-enterprise-v1-secret-key'; // In production, move to env/KV
-export interface Env { GlobalDurableObject: DurableObjectNamespace<any>; }
+const JWT_SECRET = 'suitewaste-enterprise-v1-secret-key'; 
+export interface Env { 
+  GlobalDurableObject: DurableObjectNamespace<any>; 
+  AI?: any;
+}
 export type HonoApp = Hono<{ Bindings: Env; Variables: { user?: User; sessionId?: string } }>;
 export type HonoContext = Context<{ Bindings: Env; Variables: { user?: User; sessionId?: string } }>;
 const unauthorized = () => new HTTPException(401, { message: 'Unauthorized' });
@@ -46,7 +49,7 @@ export function userRoutes(app: HonoApp) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) throw unauthorized();
     const token = authHeader.split(' ')[1];
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string, sessionId: string };
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
       const user = await new UserEntity(c.env, decoded.userId).getState();
       if (!user || !user.id || !user.active) throw unauthorized();
       c.set('user', user);
@@ -64,7 +67,6 @@ export function userRoutes(app: HonoApp) {
   app.get('/api/auth/init', async (c: HonoContext) => {
     const allUsers = (await UserEntity.list(c.env, null, 1)).items;
     if (allUsers.length === 0) {
-      // Create initial admin with hashed password
       const hashedAdminPass = await bcrypt.hash('admin789', 10);
       await UserEntity.create(c.env, {
         id: 'user-adm-001',
@@ -95,67 +97,85 @@ export function userRoutes(app: HonoApp) {
   });
   // --- HR MODULE ---
   app.get('/api/hr/staff', requireRole(['admin', 'manager']), async (c: HonoContext) => {
-    const staff = await c.env.GlobalDurableObject.idFromName('staff-root'); // Dummy placeholder for D1 integration logic
-    // Logic: In real app, query D1. For template compatibility, list from DO-based entities if defined.
-    return ok(c, []); 
+    const list = await StaffEntity.list(c.env, null, 1000);
+    return ok(c, list.items);
+  });
+  app.post('/api/hr/staff', requireRole(['admin', 'manager']), async (c: HonoContext) => {
+    const body = await c.req.json<StaffMember>();
+    const staff = await StaffEntity.create(c.env, { ...body, id: crypto.randomUUID(), last_seen: Date.now() });
+    await createAuditRecord(c, { entity_id: staff.id, entity_type: 'staff', action: 'create', payload: staff });
+    return ok(c, staff);
+  });
+  app.put('/api/hr/staff/:id', requireRole(['admin', 'manager']), async (c: HonoContext) => {
+    const id = c.req.param('id');
+    const body = await c.req.json<Partial<StaffMember>>();
+    const inst = new StaffEntity(c.env, id);
+    await inst.patch({ ...body, last_seen: Date.now() });
+    const next = await inst.getState();
+    await createAuditRecord(c, { entity_id: id, entity_type: 'staff', action: 'update', payload: next });
+    return ok(c, next);
   });
   // --- FINANCE MODULE ---
+  app.get('/api/finance/gl-summary', requireRole(['admin', 'manager', 'auditor']), async (c: HonoContext) => {
+    const accounts = await GLAccountEntity.list(c.env, null, 100);
+    return ok(c, accounts.items);
+  });
   app.get('/api/finance/vat-report', requireRole(['admin', 'manager', 'auditor']), async (c: HonoContext) => {
     const transactions = (await TransactionEntity.list(c.env, null, 1000)).items || [];
     const totalAmount = transactions.reduce((s, t) => s + t.amount, 0);
     const vatRate = 0.15;
     const netAmount = totalAmount / (1 + vatRate);
     const vatAmount = totalAmount - netAmount;
-    return ok(c, {
-      net_amount: netAmount,
-      vat_amount: vatAmount,
-      gross_amount: totalAmount,
-      currency: 'ZAR',
-      period: '2024-H1'
-    });
+    return ok(c, { net_amount: netAmount, vat_amount: vatAmount, gross_amount: totalAmount, currency: 'ZAR' });
+  });
+  // --- WORKERS AI CLASSIFICATION ---
+  app.post('/api/ai/classify', async (c: HonoContext) => {
+    const { material } = await c.req.json<{ material: string }>();
+    if (!material) return bad(c, 'Material description required');
+    let stream: WasteStreamType = 'Other';
+    try {
+      if (c.env.AI) {
+        const response = await c.env.AI.run('@cf/meta/llama-2-7b-chat-int8', {
+          messages: [
+            { role: 'system', content: 'You are an industrial waste classifier. Classify the input into one of these types: Plastic, Paper & Packaging, Glass, Metals, Electrical & Electronic, Other. Output only the category name.' },
+            { role: 'user', content: material }
+          ]
+        });
+        const aiText = response.response?.trim();
+        if (aiText) stream = aiText as WasteStreamType;
+      } else {
+        // Mock classification fallback
+        const lower = material.toLowerCase();
+        if (lower.includes('wire') || lower.includes('copper') || lower.includes('metal')) stream = 'Metals';
+        else if (lower.includes('bottle') || lower.includes('plastic')) stream = 'Plastic';
+        else if (lower.includes('box') || lower.includes('paper')) stream = 'Paper & Packaging';
+        else if (lower.includes('tv') || lower.includes('board') || lower.includes('weee')) stream = 'Electrical & Electronic';
+      }
+    } catch (e) {
+      console.warn("AI Classification failed:", e);
+    }
+    return ok(c, { suggestedStream: stream });
   });
   app.get('/api/dashboard', async (c: HonoContext) => {
-    const user = c.get('user');
-    if (!user) throw unauthorized();
-    const [suppliersPage, ledgerPage, transactionsPage] = await Promise.all([
+    const [suppliers, ledger, transactions] = await Promise.all([
       SupplierEntity.list(c.env, null, 500),
       InventoryLedgerEntity.list(c.env, null, 500),
       TransactionEntity.list(c.env, null, 500),
     ]);
-    const itemsSuppliers = suppliersPage.items || [];
-    const itemsLedger = ledgerPage.items || [];
-    const itemsTransactions = transactionsPage.items || [];
-    const summaryData = {
-      totalWeight: itemsLedger.reduce((sum, item) => sum + item.weight_kg, 0),
-      totalValue: itemsTransactions.reduce((sum, item) => sum + item.amount, 0),
-      totalEPR: itemsTransactions.reduce((sum, item) => sum + item.epr_fee, 0),
-      weeePct: itemsSuppliers.length > 0 ? (itemsSuppliers.filter(s => s.is_weee_compliant).length / itemsSuppliers.length) * 100 : 0,
-      recentLedger: itemsLedger.slice(0, 5),
-      recentTransactions: itemsTransactions.slice(0, 5)
-    };
-    return ok(c, { summary: summaryData });
-  });
-  app.post('/api/transactions', async (c: HonoContext) => {
-    const body = await c.req.json<Partial<Transaction>>();
-    const now = Date.now();
-    const t: Transaction = { 
-      id: crypto.randomUUID(), 
-      ledger_entry_id: body.ledger_entry_id || "", 
-      amount: body.amount || 0, 
-      currency: "ZAR", 
-      transaction_timestamp: now, 
-      epr_fee: body.epr_fee || 0, 
-      is_synced: true, 
-      created_at: now, 
-      ...body 
-    } as Transaction;
-    const created = await TransactionEntity.create(c.env, t);
-    // Auto-Post to General Ledger for High-Value Transaction
-    if (t.amount > 5000) {
-      await createAuditRecord(c, { entity_id: t.id, entity_type: 'finance', action: 'create', payload: { type: 'GL_AUTO_POST', amount: t.amount } });
-    }
-    await createAuditRecord(c, { entity_id: t.id, entity_type: 'transaction', action: 'create', payload: t });
-    return ok(c, created);
+    const itemsSuppliers = suppliers.items || [];
+    const itemsLedger = ledger.items || [];
+    const itemsTransactions = transactions.items || [];
+    return ok(c, {
+      summary: {
+        totalWeight: itemsLedger.reduce((sum, item) => sum + item.weight_kg, 0),
+        totalValue: itemsTransactions.reduce((sum, item) => sum + item.amount, 0),
+        totalEPR: itemsTransactions.reduce((sum, item) => sum + item.epr_fee, 0),
+        weeePct: itemsSuppliers.length > 0 ? (itemsSuppliers.filter(s => s.is_weee_compliant).length / itemsSuppliers.length) * 100 : 0,
+        recentLedger: itemsLedger.slice(0, 5),
+        recentTransactions: itemsTransactions.slice(0, 5),
+        recentSuppliers: itemsSuppliers.slice(0, 5)
+      }
+    });
   });
   app.get('/api/auth/me', async (c: HonoContext) => {
     const user = c.get('user');

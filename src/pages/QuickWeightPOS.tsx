@@ -9,15 +9,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSerialScale } from "@/hooks/useSerialScale";
 import { useOfflineStore } from "@/stores/useOfflineStore";
 import { cn } from "@/lib/utils";
-import { Cable, CheckCircle, CircleDashed, Loader2, Send, XCircle, ArrowLeft } from "lucide-react";
+import { Cable, CheckCircle, CircleDashed, Loader2, Send, XCircle, ArrowLeft, Sparkles, BrainCircuit } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-import type { Supplier } from "@shared/types";
+import type { Supplier, WasteStreamType } from "@shared/types";
 import { v4 as uuid } from 'uuid';
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/PageLayout";
+import { motion, AnimatePresence } from "framer-motion";
 const WeightDisplay = memo(({ weight, status }: { weight: number, status: string }) => (
   <div className="relative w-full text-center mb-6">
     <span
@@ -46,11 +47,33 @@ export function QuickWeightPOS() {
   const [materialType, setMaterialType] = useState("");
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
+  const [isAiClassifying, setIsAiClassifying] = useState(false);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => api<Supplier[]>('/api/suppliers'),
     enabled: !!user,
   });
+  const handleAiClassify = async () => {
+    if (!materialType.trim()) {
+      toast.error("Please enter a basic description first");
+      return;
+    }
+    setIsAiClassifying(true);
+    try {
+      const res = await api<{ suggestedStream: WasteStreamType }>('/api/ai/classify', {
+        method: 'POST',
+        body: JSON.stringify({ material: materialType })
+      });
+      setMaterialType(res.suggestedStream);
+      toast.success(`AI Suggestion: ${res.suggestedStream}`, {
+        icon: <Sparkles className="h-4 w-4 text-primary" />
+      });
+    } catch (e) {
+      toast.error("AI Classification failed");
+    } finally {
+      setIsAiClassifying(false);
+    }
+  };
   const handleCapture = () => {
     if (status !== 'connected' && status !== 'parsing') {
       toast.error("Scale not connected.");
@@ -74,7 +97,7 @@ export function QuickWeightPOS() {
       return;
     }
     const ledgerEntryId = uuid();
-    const eprFee = weight * 0.1; // Mock EPR fee calculation
+    const eprFee = weight * 0.1; 
     addLedgerEntry({
       id: ledgerEntryId,
       supplier_id: supplierId,
@@ -115,37 +138,37 @@ export function QuickWeightPOS() {
           <Card className="bg-card/80 border-border backdrop-blur-xl shadow-glow shadow-primary/40 hover:shadow-primary/60 transition-shadow flex-1 flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div className="flex items-center gap-4">
-                <Link to="/" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
-                  <ArrowLeft className="h-4 w-4" />
-                  <span className="text-xs font-semibold hidden sm:inline">Dashboard</span>
+                <Link to="/" className="group flex items-center gap-2 px-3 py-1 rounded-full bg-accent/50 text-muted-foreground hover:text-primary transition-all">
+                  <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+                  <span className="text-xs font-bold uppercase tracking-tighter">Dashboard</span>
                 </Link>
-                <CardTitle className="text-lg font-medium text-muted-foreground">Live Weight</CardTitle>
+                <CardTitle className="text-lg font-bold text-muted-foreground uppercase tracking-widest">Live Weight</CardTitle>
               </div>
-              <div className="flex items-center gap-2 text-sm capitalize text-muted-foreground">
+              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-tighter text-muted-foreground">
                 {statusIndicator[status]}
                 {status}
               </div>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col items-center justify-center p-6">
+            <CardContent className="flex-1 flex flex-col items-center justify-center p-6 min-h-[400px]">
               <WeightDisplay weight={weight} status={status} />
               <div className="w-full flex flex-col sm:flex-row gap-4">
                 <Button
                   size="lg"
-                  className="flex-1 bg-gradient-to-r from-primary to-green-600 hover:from-primary hover:to-emerald-600 text-primary-foreground h-14 text-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-ring shadow-glow-lg shadow-primary/40"
+                  className="flex-1 bg-gradient-to-r from-primary to-green-600 hover:from-primary hover:to-emerald-600 text-primary-foreground h-16 text-xl font-bold transition-all duration-200 hover:scale-[1.02] active:scale-95 shadow-glow-lg shadow-primary/40"
                   onClick={handleCapture}
                   disabled={status !== 'connected' && status !== 'parsing'}
                 >
-                  Capture Weight & Transaction
+                  Capture & Transact
                 </Button>
                 <Button
                   size="lg"
                   variant="outline"
-                  className="flex-1 hover:bg-accent h-14 text-lg font-semibold transition-all"
+                  className="flex-1 hover:bg-accent h-16 text-lg font-bold border-2 transition-all"
                   onClick={connect}
                   disabled={status === 'connected' || status === 'connecting' || status === 'parsing'}
                 >
-                  <Cable className="mr-2 h-5 w-5" />
-                  Connect Device
+                  <Cable className="mr-2 h-6 w-6" />
+                  Pair Scale
                 </Button>
               </div>
             </CardContent>
@@ -154,44 +177,72 @@ export function QuickWeightPOS() {
         <div className="md:col-span-1">
           <Card className="bg-card/80 border-border backdrop-blur-xl shadow-glow shadow-primary/40 h-full">
             <CardHeader>
-              <CardTitle className="text-lg font-medium text-muted-foreground">Transaction Details</CardTitle>
+              <CardTitle className="text-lg font-bold text-muted-foreground uppercase tracking-widest">Session Details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div>
-                <label htmlFor="supplier" className="text-sm font-medium text-muted-foreground mb-1 block">Supplier</label>
+                <label className="text-xs font-bold uppercase tracking-tighter text-muted-foreground mb-2 block">Supplier Account</label>
                 {isLoadingSuppliers ? <Skeleton className="h-14 w-full" /> : (
                   <Select onValueChange={setSupplierId} value={supplierId || ''}>
-                    <SelectTrigger className="bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring h-14">
-                      <SelectValue placeholder="Select a supplier" />
+                    <SelectTrigger className="bg-input border-border text-foreground h-14 font-bold">
+                      <SelectValue placeholder="Select Partner" />
                     </SelectTrigger>
                     <SelectContent>
-                      {suppliers?.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      {suppliers?.map(s => <SelectItem key={s.id} value={s.id} className="font-bold">{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 )}
               </div>
-              <div>
-                <label htmlFor="material" className="text-sm font-medium text-muted-foreground mb-1 block">Material Type</label>
-                <Input id="material" placeholder="e.g., Copper Wire" value={materialType} onChange={e => setMaterialType(e.target.value)} className="bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring h-14" />
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-tighter text-muted-foreground block">Material Type & EPR Stream</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input placeholder="e.g., Copper" value={materialType} onChange={e => setMaterialType(e.target.value)} className="h-14 bg-input border-border font-bold pr-10" />
+                    <AnimatePresence>
+                      {isAiClassifying && (
+                        <motion.div 
+                          initial={{ opacity: 0 }} 
+                          animate={{ opacity: 1 }} 
+                          exit={{ opacity: 0 }}
+                          className="absolute inset-0 bg-primary/10 rounded-lg flex items-center justify-center backdrop-blur-[2px]"
+                        >
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    className="h-14 w-14 p-0 shadow-soft border border-primary/20 hover:bg-primary/20 transition-colors"
+                    onClick={handleAiClassify}
+                    disabled={isAiClassifying || !materialType}
+                    title="Smart AI Classification"
+                  >
+                    <BrainCircuit className={cn("h-6 w-6 text-primary", isAiClassifying && "animate-pulse")} />
+                  </Button>
+                </div>
               </div>
                <div>
-                <label htmlFor="amount" className="text-sm font-medium text-muted-foreground mb-1 block">Amount (ZAR)</label>
-                <Input id="amount" type="number" placeholder="e.g., 1250.50" value={amount} onChange={e => setAmount(e.target.value)} className="bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring h-14" />
+                <label className="text-xs font-bold uppercase tracking-tighter text-muted-foreground mb-2 block">Gross Amount (ZAR)</label>
+                <Input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} className="h-14 bg-input border-border font-mono font-bold text-xl" />
               </div>
-              <div>
-                <label htmlFor="notes" className="text-sm font-medium text-muted-foreground mb-1 block">Notes</label>
-                <Textarea id="notes" placeholder="Optional notes..." value={notes} onChange={e => setNotes(e.target.value)} className="bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring" />
+              <div className="pt-4 border-t border-border/50">
+                <Button onClick={handleSync} className="w-full h-16 text-xl font-bold relative" variant="secondary" disabled={totalPending === 0}>
+                  <Send className="mr-2 h-5 w-5" />
+                  Sync Queue
+                  {totalPending > 0 && (
+                    <Badge className="absolute -top-2 -right-2 bg-destructive text-white h-7 w-7 flex items-center justify-center rounded-full animate-bounce text-xs p-0 border-2 border-background">
+                      {totalPending}
+                    </Badge>
+                  )}
+                </Button>
               </div>
-              <Button onClick={handleSync} className="w-full h-14 text-lg" disabled={totalPending === 0}>
-                <Send className="mr-2 h-4 w-4" />
-                Sync Pending
-                {totalPending > 0 && <Badge className="ml-2 bg-destructive animate-pulse">{totalPending}</Badge>}
-              </Button>
             </CardContent>
           </Card>
         </div>
       </div>
-      <Toaster richColors theme="dark" />
+      <Toaster richColors theme="dark" position="top-center" />
     </PageLayout>
   );
 }
