@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { PageLayout } from '@/components/PageLayout';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useOfflineStore } from '@/stores/useOfflineStore';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { ShieldAlert, Send, Hash, Bell, Terminal, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 const channels = [
   { id: 'general', name: 'General', icon: Hash },
   { id: 'logistics', name: 'Logistics', icon: Terminal },
@@ -53,7 +53,6 @@ export function Chat() {
   return (
     <PageLayout>
       <div className="max-w-7xl mx-auto h-[calc(100dvh-12rem)] border border-border rounded-3xl overflow-hidden flex bg-card/60 backdrop-blur-xl shadow-2xl">
-        {/* Sidebar */}
         <div className="w-64 border-r border-border/50 bg-secondary/20 hidden md:flex flex-col">
           <header className="p-6 border-b border-border/50">
             <h2 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Channels</h2>
@@ -65,23 +64,22 @@ export function Chat() {
                   key={chan.id}
                   onClick={() => setActiveChannel(chan.id)}
                   className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all",
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all truncate",
                     activeChannel === chan.id ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
                 >
-                  <chan.icon className="h-4 w-4" />
-                  {chan.name}
+                  <chan.icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{chan.name}</span>
                 </button>
               ))}
             </div>
           </ScrollArea>
         </div>
-        {/* Chat Area */}
         <div className="flex-1 flex flex-col">
           <header className="h-16 px-6 border-b border-border/50 flex items-center justify-between bg-card/40">
-            <div className="flex items-center gap-3">
-              <span className="font-black uppercase tracking-tighter text-lg">{activeChannel}</span>
-              <Badge variant="outline" className="text-[10px] font-bold">ENCRYPTED</Badge>
+            <div className="flex items-center gap-3 overflow-hidden">
+              <span className="font-black uppercase tracking-tighter text-lg truncate">{activeChannel}</span>
+              <Badge variant="outline" className="text-[10px] font-bold shrink-0">ENCRYPTED</Badge>
             </div>
             <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground">
               <Users className="h-4 w-4" /> 12 Online
@@ -97,7 +95,7 @@ export function Chat() {
                       <AvatarFallback className="bg-primary text-white font-black">{msg.user.charAt(0)}</AvatarFallback>
                     </Avatar>
                   )}
-                  {msg.isSystem && <div className="p-2 rounded-lg bg-secondary/50"><Bell className="h-4 w-4 text-primary" /></div>}
+                  {msg.isSystem && <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20"><Bell className="h-4 w-4 text-emerald-500" /></div>}
                   <div className={cn("space-y-1", msg.isSender ? "items-end text-right" : "items-start")}>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{msg.user}</span>
@@ -105,7 +103,7 @@ export function Chat() {
                     </div>
                     <div className={cn(
                       "px-4 py-3 rounded-2xl text-sm font-medium max-w-sm md:max-w-md",
-                      msg.isSender ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10 rounded-tr-none" : 
+                      msg.isSender ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10 rounded-tr-none" :
                       msg.isSystem ? "bg-emerald-500/5 border border-emerald-500/20 text-emerald-500 font-bold" : "bg-secondary/50 rounded-tl-none"
                     )}>
                       {msg.text}

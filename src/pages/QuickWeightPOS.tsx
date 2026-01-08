@@ -5,14 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSerialScale } from "@/hooks/useSerialScale";
 import { useMultiScale } from "@/hooks/useMultiScale";
 import { usePrinter } from "@/hooks/usePrinter";
 import { useOfflineStore } from "@/stores/useOfflineStore";
 import { cn } from "@/lib/utils";
-import { Cable, CheckCircle, CircleDashed, Loader2, Send, XCircle, ArrowLeft, BrainCircuit, Sparkles, Printer, Activity } from "lucide-react";
+import { Cable, Loader2, Send, XCircle, ArrowLeft, BrainCircuit, Sparkles, Printer, Activity } from "lucide-react";
 import { Toaster, toast } from "sonner";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import type { Supplier, WasteStreamType } from "@shared/types";
 import { v4 as uuid } from 'uuid';
@@ -38,8 +37,7 @@ const WeightDisplay = memo(({ weight, status }: { weight: number, status: string
 ));
 export function QuickWeightPOS() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const { weight, status, connect } = useSerialScale();
+  const { weight, status, connect, devices } = useMultiScale();
   const { status: printerStatus, connect: connectPrinter } = usePrinter();
   const addLedgerEntry = useOfflineStore(s => s.addLedgerEntry);
   const addTransaction = useOfflineStore(s => s.addTransaction);
@@ -49,6 +47,7 @@ export function QuickWeightPOS() {
   const [materialType, setMaterialType] = useState("");
   const [amount, setAmount] = useState("");
   const [isAiClassifying, setIsAiClassifying] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => api<Supplier[]>('/api/suppliers'),
@@ -89,12 +88,14 @@ export function QuickWeightPOS() {
       return;
     }
     const ledgerEntryId = uuid();
+    const activeDevice = devices.find(d => d.status === 'parsing' || d.status === 'connected')?.id || 'unknown-scale';
     addLedgerEntry({
       id: ledgerEntryId,
       supplier_id: supplierId,
       material_type: materialType.trim(),
       weight_kg: weight,
       operator_id: user?.id,
+      device_id: activeDevice,
     });
     addTransaction({
       ledger_entry_id: ledgerEntryId,
@@ -104,6 +105,14 @@ export function QuickWeightPOS() {
     });
     setMaterialType("");
     setAmount("");
+  };
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await syncAllPending();
+    } finally {
+      setIsSyncing(false);
+    }
   };
   return (
     <PageLayout>
@@ -115,7 +124,7 @@ export function QuickWeightPOS() {
                 <ArrowLeft className="h-4 w-4" /> Dashboard
               </Link>
               <Badge variant="outline" className="gap-2 px-3 py-1 font-bold">
-                {status === 'connected' ? <Activity className="h-3 w-3 text-green-500 animate-pulse" /> : <XCircle className="h-3 w-3 text-red-500" />}
+                {(status === 'connected' || status === 'parsing') ? <Activity className="h-3 w-3 text-green-500 animate-pulse" /> : <XCircle className="h-3 w-3 text-red-500" />}
                 {status.toUpperCase()}
               </Badge>
             </CardHeader>
@@ -125,7 +134,7 @@ export function QuickWeightPOS() {
                 <Button size="lg" className="flex-1 h-20 text-2xl font-bold shadow-primary/40 shadow-xl" onClick={handleCapture} disabled={status !== 'connected' && status !== 'parsing'}>
                   Capture & Post
                 </Button>
-                <Button size="lg" variant="outline" className="h-20 px-8" onClick={connect} disabled={status === 'connected'}>
+                <Button size="lg" variant="outline" className="h-20 px-8" onClick={connect} disabled={status === 'connected' || status === 'connecting'}>
                   <Cable className="h-8 w-8" />
                 </Button>
               </div>
@@ -135,7 +144,7 @@ export function QuickWeightPOS() {
             <CardContent className="p-4 flex items-center justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <Activity className={cn("h-4 w-4", status === 'connected' ? "text-emerald-500" : "text-muted-foreground")} />
+                  <Activity className={cn("h-4 w-4", (status === 'connected' || status === 'parsing') ? "text-emerald-500" : "text-muted-foreground")} />
                   Scale: {status}
                 </div>
                 <div className="flex items-center gap-2">
@@ -184,8 +193,9 @@ export function QuickWeightPOS() {
                 <label className="text-[10px] font-bold uppercase text-muted-foreground">Transaction Value (ZAR)</label>
                 <Input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} className="h-14 bg-secondary/50 font-mono font-bold text-lg" />
               </div>
-              <Button onClick={() => syncAllPending()} disabled={totalPending === 0} className="w-full h-14 bg-accent/50 text-accent-foreground font-bold" variant="secondary">
-                <Send className="mr-2 h-4 w-4" /> Sync Local Queue ({totalPending})
+              <Button onClick={handleSync} disabled={totalPending === 0 || isSyncing} className="w-full h-14 bg-accent/50 text-accent-foreground font-bold" variant="secondary">
+                {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                Sync Local Queue ({totalPending})
               </Button>
             </CardContent>
           </Card>

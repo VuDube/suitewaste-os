@@ -1,23 +1,16 @@
-import React, { useState, useMemo, memo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, memo } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { PageLayout } from '@/components/PageLayout';
 import { api } from '@/lib/api-client';
-import type { User, EPRReport, ConfigUserUpdate } from '@shared/types';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { ShieldAlert, Download, Loader2, LogOut, ShieldCheck, Database, Trash2, Key, History } from 'lucide-react';
+import { ShieldAlert, Download, Loader2, Database, Trash2, History, Briefcase, FileCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
-const COLORS = ['#38761d', '#5a9a47', '#7cb870', '#a0d69a', '#c5f4c3', '#e7f9e6'];
-const EPR_STREAMS = ['Plastic', 'Paper & Packaging', 'Glass', 'Metals', 'Electrical & Electronic', 'Other'] as const;
+import { Link } from 'react-router-dom';
 const DataGovernanceTab = memo(() => {
   const logout = useAuthStore(s => s.logout);
   const [purgeConfirm, setPurgeConfirm] = useState('');
@@ -117,8 +110,22 @@ export function Settings() {
             <TabsTrigger value="epr" className="h-full px-8 rounded-lg font-bold">EPR Compliance</TabsTrigger>
           </TabsList>
           <TabsContent value="privacy"><DataGovernanceTab /></TabsContent>
-          <TabsContent value="roles"><div className="p-12 text-center text-muted-foreground italic border rounded-2xl">Permission management available in production dashboard.</div></TabsContent>
-          <TabsContent value="epr"><div className="p-12 text-center text-muted-foreground italic border rounded-2xl">EPR reporting tools active in Enterprise Ledger view.</div></TabsContent>
+          <TabsContent value="roles">
+            <Card className="p-12 text-center space-y-4">
+              <Briefcase className="h-12 w-12 mx-auto text-primary" />
+              <h3 className="text-xl font-bold">Role Management centralized in Staff Portal</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">To ensure industrial safety and clear accountability, user roles and feature permissions are managed through the centralized HR Staff Manager.</p>
+              <Button asChild className="font-bold"><Link to="/staff">Go to Staff Manager</Link></Button>
+            </Card>
+          </TabsContent>
+          <TabsContent value="epr">
+            <Card className="p-12 text-center space-y-4">
+              <FileCheck className="h-12 w-12 mx-auto text-emerald-500" />
+              <h3 className="text-xl font-bold">Regulatory Framework: GovGaz 43956</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">SuiteWaste OS is pre-configured to adhere to the South African Extended Producer Responsibility (EPR) regulations. All waste streams are tracked against the national targets.</p>
+              <Button asChild variant="outline" className="font-bold border-emerald-500/20 text-emerald-500"><Link to="/audit">Verify Chain of Custody</Link></Button>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </PageLayout>
