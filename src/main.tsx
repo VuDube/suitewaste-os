@@ -15,6 +15,7 @@ import { InventoryLedger } from '@/pages/InventoryLedger';
 import { Transactions } from '@/pages/Transactions';
 import { HardwareIntegrations } from '@/pages/HardwareIntegrations';
 import { Login } from '@/pages/Login';
+import { AuditLog } from '@/pages/AuditLog';
 import { Settings } from '@/pages/Settings';
 import { Chat } from '@/pages/Chat';
 const queryClient = new QueryClient({
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
   { path: "/ledger", element: <InventoryLedger />, errorElement: <RouteErrorBoundary /> },
   { path: "/transactions", element: <Transactions />, errorElement: <RouteErrorBoundary /> },
   { path: "/hardware", element: <HardwareIntegrations />, errorElement: <RouteErrorBoundary /> },
+  { path: "/audit", element: <AuditLog />, errorElement: <RouteErrorBoundary /> },
   { path: "/settings", element: <Settings />, errorElement: <RouteErrorBoundary /> },
   { path: "/chat", element: <Chat />, errorElement: <RouteErrorBoundary /> },
 ]);

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Context, Next } from 'hono';
-import { SupplierEntity, InventoryLedgerEntity, TransactionEntity, UserEntity, SessionEntity } from "./entities";
+import { SupplierEntity, InventoryLedgerEntity, TransactionEntity, UserEntity, SessionEntity, AuditLogEntity } from "./entities";
 import { ok, bad, notFound } from './core-utils';
 import type { InventoryLedgerEntry, Supplier, Transaction, User, ConfigUserUpdate, Session } from "@shared/types";
 import { HTTPException } from "hono/http-exception";
@@ -9,6 +9,35 @@ export type HonoApp = Hono<{ Bindings: Env; Variables: { user?: User; sessionId?
 export type HonoContext = Context<{ Bindings: Env; Variables: { user?: User; sessionId?: string } }>;
 const unauthorized = () => new HTTPException(401, { message: 'Unauthorized' });
 const forbidden = () => new HTTPException(403, { message: 'Forbidden' });
+async function sha256(message: string) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function createAuditRecord(c: HonoContext, params: { entity_id: string, entity_type: any, action: any, payload: any }) {
+  const user = c.get('user');
+  const prevHash = await AuditLogEntity.getLatestHash(c.env);
+  const timestamp = Date.now();
+  const payloadStr = JSON.stringify(params.payload);
+  const content = `${timestamp}|${user?.id || 'system'}|${params.action}|${payloadStr}|${prevHash}`;
+  const hash = await sha256(content);
+  
+  const log: AuditLog = {
+    id: crypto.randomUUID(),
+    entity_id: params.entity_id,
+    entity_type: params.entity_type,
+    action: params.action,
+    actor_id: user?.id || 'system',
+    timestamp,
+    payload_hash: hash,
+    previous_hash: prevHash,
+    details: payloadStr.substring(0, 1000)
+  };
+  await AuditLogEntity.create(c.env, log);
+}
+
 const getEprStream = (materialType: string): string => {
   const lowerMat = materialType.toLowerCase();
   if (lowerMat.includes('plastic') || lowerMat.includes('pet') || lowerMat.includes('hdpe') || lowerMat.includes('pvc')) return 'Plastic';
@@ -118,9 +147,15 @@ export function userRoutes(app: HonoApp) {
     return ok(c, { 
       compliance_pct: (suppliers.items?.length || 0) > 0 ? (suppliers.items!.filter(s => s.is_weee_compliant).length / suppliers.items!.length) * 100 : 0,
       total_fees: (transactions.items || []).reduce((sum, t) => sum + t.epr_fee, 0),
-      streams 
+      streams
     });
   });
+
+  app.get('/api/audit', requireRole(['admin', 'auditor']), async (c: HonoContext) => {
+    const logs = await AuditLogEntity.list(c.env, c.req.query('cursor'), 50);
+    return ok(c, logs);
+  });
+
   app.post('/api/config/users', requireRole(['admin']), async (c: HonoContext) => {
     const updates = await c.req.json<ConfigUserUpdate[]>();
     for (const u of updates) {
@@ -136,23 +171,34 @@ export function userRoutes(app: HonoApp) {
     const body = await c.req.json<Partial<Supplier>>();
     const now = Date.now();
     const s: Supplier = { id: crypto.randomUUID(), name: body.name || "New Supplier", is_weee_compliant: !!body.is_weee_compliant, created_at: now, updated_at: now, ...body };
-    return ok(c, await SupplierEntity.create(c.env, s));
+    const created = await SupplierEntity.create(c.env, s);
+    await createAuditRecord(c, { entity_id: s.id, entity_type: 'supplier', action: 'create', payload: s });
+    return ok(c, created);
   });
   app.get('/api/suppliers', async (c: HonoContext) => ok(c, (await SupplierEntity.list(c.env, null, 200)).items || []));
-  app.delete('/api/suppliers/:id', requireRole(['admin', 'manager']), async (c: HonoContext) => ok(c, { deleted: await SupplierEntity.delete(c.env, c.req.param('id')) }));
+  app.delete('/api/suppliers/:id', requireRole(['admin', 'manager']), async (c: HonoContext) => {
+    const id = c.req.param('id');
+    const deleted = await SupplierEntity.delete(c.env, id);
+    if (deleted) await createAuditRecord(c, { entity_id: id, entity_type: 'supplier', action: 'delete', payload: { id } });
+    return ok(c, { deleted });
+  });
   app.get('/api/ledger', async (c: HonoContext) => ok(c, (await InventoryLedgerEntity.list(c.env, null, 500)).items || []));
   app.post('/api/ledger', async (c: HonoContext) => {
     const body = await c.req.json<Partial<InventoryLedgerEntry>>();
     const now = Date.now();
     const entry: InventoryLedgerEntry = { id: crypto.randomUUID(), supplier_id: body.supplier_id || "", material_type: body.material_type || "Unknown", weight_kg: body.weight_kg || 0, capture_timestamp: now, is_synced: true, created_at: now, ...body };
-    return ok(c, await InventoryLedgerEntity.create(c.env, entry));
+    const created = await InventoryLedgerEntity.create(c.env, entry);
+    await createAuditRecord(c, { entity_id: entry.id, entity_type: 'ledger', action: 'create', payload: entry });
+    return ok(c, created);
   });
   app.get('/api/transactions', async (c: HonoContext) => ok(c, (await TransactionEntity.list(c.env, null, 500)).items || []));
   app.post('/api/transactions', async (c: HonoContext) => {
     const body = await c.req.json<Partial<Transaction>>();
     const now = Date.now();
     const t: Transaction = { id: crypto.randomUUID(), ledger_entry_id: body.ledger_entry_id || "", amount: body.amount || 0, currency: "ZAR", transaction_timestamp: now, epr_fee: body.epr_fee || 0, is_synced: true, created_at: now, ...body };
-    return ok(c, await TransactionEntity.create(c.env, t));
+    const created = await TransactionEntity.create(c.env, t);
+    await createAuditRecord(c, { entity_id: t.id, entity_type: 'transaction', action: 'create', payload: t });
+    return ok(c, created);
   });
   app.post('/api/sync/ledger', async (c: HonoContext) => {
     const { pendingEntries } = await c.req.json<{ pendingEntries: InventoryLedgerEntry[] }>();

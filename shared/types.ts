@@ -3,6 +3,14 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
 }
+// --- Waste Streams per GovGaz43956 ---
+export type WasteStreamType = 
+  | 'Plastic' 
+  | 'Paper & Packaging' 
+  | 'Glass' 
+  | 'Metals' 
+  | 'Electrical & Electronic' 
+  | 'Other';
 // --- SuiteWaste OS Core Types ---
 export interface User {
   id: string;
@@ -56,6 +64,26 @@ export interface Transaction {
   is_synced: boolean;
   created_at: number; // epoch millis
 }
+// --- Enterprise V1.0 Compliance & Audit ---
+export interface AuditLog {
+  id: string;
+  entity_id: string;
+  entity_type: 'supplier' | 'ledger' | 'transaction' | 'user' | 'system';
+  action: 'create' | 'update' | 'delete' | 'login' | 'verify';
+  actor_id: string;
+  timestamp: number;
+  payload_hash: string;
+  previous_hash: string;
+  details?: string;
+}
+export interface ScaleConfig {
+  id: string;
+  name: string;
+  baudRate: number;
+  usbVendorId?: number;
+  usbProductId?: number;
+  isPrimary: boolean;
+}
 // --- Admin & Reporting Types ---
 export interface EPRStreamData {
   weight: number;
@@ -64,9 +92,11 @@ export interface EPRStreamData {
 export interface EPRReport {
   compliance_pct: number;
   total_fees: number;
-  pro_xml_mock_hash?: string; // Mock R2 key for a PRO XML certificate
+  audit_chain_status: 'verified' | 'tampered' | 'pending';
+  regulation_metadata: string; // e.g., "GovGaz43956"
+  pro_xml_mock_hash?: string;
   streams: {
-    [stream: string]: EPRStreamData;
+    [key in WasteStreamType]?: EPRStreamData;
   };
 }
 export type ConfigUserUpdate = Pick<User, 'id' | 'role' | 'active' | 'features'>;

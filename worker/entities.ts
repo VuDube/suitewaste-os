@@ -70,3 +70,24 @@ export class UserEntity extends IndexedEntity<User> {
   };
   static seedData = MOCK_USERS;
 }
+
+// AUDIT LOG ENTITY
+export class AuditLogEntity extends IndexedEntity<AuditLog> {
+  static readonly entityName = "audit_log";
+  static readonly indexName = "audit_logs";
+  static readonly initialState: AuditLog = {
+    id: "",
+    entity_id: "",
+    entity_type: "system",
+    action: "verify",
+    actor_id: "system",
+    timestamp: 0,
+    payload_hash: "0",
+    previous_hash: "0",
+  };
+
+  static async getLatestHash(env: Env): Promise<string> {
+    const logs = await this.list(env, null, 1);
+    return logs.items[0]?.payload_hash || "0000000000000000000000000000000000000000000000000000000000000000";
+  }
+}

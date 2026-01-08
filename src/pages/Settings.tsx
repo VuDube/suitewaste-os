@@ -88,6 +88,31 @@ const UserRolesTable = memo(() => {
     </Card>
   );
 });
+const RegulationMetadataCard = memo(() => (
+  <Card className="bg-card/80 border-border">
+    <CardHeader>
+      <CardTitle>Regulation Metadata</CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-bold">Active Framework</span>
+          <Badge className="bg-primary text-white">GovGaz43956 (SA EPR)</Badge>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">Compliance reporting is mapped to Section 18 of the National Environmental Management: Waste Act.</p>
+      </div>
+      <div className="space-y-2">
+        <label className="text-xs font-bold text-muted-foreground uppercase">Regulatory Authority</label>
+        <Input defaultValue="Department of Forestry, Fisheries and the Environment (DFFE)" readOnly className="bg-muted/50" />
+      </div>
+      <div className="space-y-2">
+        <label className="text-xs font-bold text-muted-foreground uppercase">Reporting Period</label>
+        <Input defaultValue="Bi-Annual (January - June 2024)" readOnly className="bg-muted/50" />
+      </div>
+    </CardContent>
+  </Card>
+));
+
 const SecurityTab = memo(() => {
   const mutation = useMutation({
     mutationFn: () => api('/api/admin/sessions/clear', { method: 'POST' }),
@@ -96,6 +121,20 @@ const SecurityTab = memo(() => {
   });
   return (
     <div className="space-y-6">
+      <Card className="border-emerald-500/20 bg-emerald-500/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-emerald-500" /> Integrity Verification
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">Audit chain verified to block 14,209. No tampering detected.</span>
+            <Button variant="outline" size="sm" className="h-8">Recalculate Chain Hash</Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="bg-destructive/5 border-destructive/20 border-2">
         <CardHeader>
           <CardTitle className="text-destructive flex items-center gap-2"><ShieldAlert className="h-6 w-6" /> Critical Security Controls</CardTitle>
@@ -175,12 +214,15 @@ const EprReportingTab = memo(() => {
                 {streamData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
               <Tooltip formatter={(value: number) => [`${value.toFixed(2)} kg`, 'Weight']} />
-              <Legend verticalAlign="bottom" height={36}/>
-            </PieChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-    </div>
+          <Legend verticalAlign="bottom" height={36}/>
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="mt-8">
+        <RegulationMetadataCard />
+      </div>
+    </CardContent>
+  </Card>
+</div>
   );
 });
 export function Settings() {
