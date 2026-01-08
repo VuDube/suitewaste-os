@@ -1,3 +1,6 @@
+import { Buffer } from 'buffer';
+globalThis.Buffer = Buffer;
+
 import { Hono } from "hono";
 import type { Context, Next } from 'hono';
 import { 
