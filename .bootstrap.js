@@ -82,7 +82,7 @@ function runSetupCommands() {
     "bun add localforage@^1.10.0",
     "bun add workbox-window@^7.1.0",
     "bun add workbox-window",
-    "bun add bcryptjs jsonwebtoken pdfmake leaflet",
+    "bun add bcryptjs jsonwebtoken",
     "bun add idb-keyval@^6.2.1",
     "bun add tslib@^2.6.3",
     "bun add @types/jsonwebtoken -d"
