@@ -81,7 +81,8 @@ function runSetupCommands() {
     "bun add idb-keyval@^6.2.2",
     "bun add localforage@^1.10.0",
     "bun add workbox-window@^7.1.0",
-    "bun add workbox-window"
+    "bun add workbox-window",
+    "bun add bcryptjs jsonwebtoken pdfmake leaflet"
 ];
     
     if (commands.length === 0) {
