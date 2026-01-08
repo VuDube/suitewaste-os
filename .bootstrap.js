@@ -85,7 +85,8 @@ function runSetupCommands() {
     "bun add bcryptjs jsonwebtoken",
     "bun add idb-keyval@^6.2.1",
     "bun add tslib@^2.6.3",
-    "bun add @types/jsonwebtoken -d"
+    "bun add @types/jsonwebtoken -d",
+    "bun add buffer@^6.1.1 jsonwebtoken@^9.2.1"
 ];
     
     if (commands.length === 0) {
