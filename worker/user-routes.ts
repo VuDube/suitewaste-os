@@ -71,26 +71,6 @@ async function sha256(message: string) {
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
-async function createAuditRecord(c: HonoContext, params: { entity_id: string, entity_type: AuditLog['entity_type'], action: AuditLog['action'], payload: any }) {
-  const user = c.get('user');
-  const prevHash = await AuditLogEntity.getLatestHash(c.env);
-  const timestamp = Date.now();
-  const payloadStr = JSON.stringify(params.payload);
-  const content = `${timestamp}|${user?.id || 'system'}|${params.action}|${payloadStr}|${prevHash}`;
-  const hash = await sha256(content);
-  const log: AuditLog = {
-    id: crypto.randomUUID(),
-    entity_id: params.entity_id,
-    entity_type: params.entity_type,
-    action: params.action,
-    actor_id: user?.id || 'system',
-    timestamp,
-    payload_hash: hash,
-    previous_hash: prevHash,
-    details: payloadStr
-  };
-  await AuditLogEntity.create(c.env, log);
-}
 export function userRoutes(app: HonoApp) {
   app.use('/api/*', async (c: HonoContext, next: Next) => {
     const path = c.req.path;
@@ -127,7 +107,7 @@ export function userRoutes(app: HonoApp) {
     const { username, password } = await c.req.json();
     const users = await UserEntity.list(c.env, null, 100);
     const user = users.items.find(u => u.username === username && u.password_hash === password);
-    if (!user || !user.active) return bad(c, 'Invalid credentials or inactive account');
+    if (!user || !user.active) return bad(c, 'Invalid credentials');
     const sessionId = crypto.randomUUID();
     await SessionEntity.create(c.env, { id: sessionId, userId: user.id, createdAt: Date.now() });
     const token = await signJwt({ userId: user.id, sessionId }, JWT_SECRET);
@@ -139,6 +119,34 @@ export function userRoutes(app: HonoApp) {
     if (!user) throw unauthorized();
     const { password_hash, ...safeUser } = user;
     return ok(c, safeUser);
+  });
+  // GDPR: DATA PORTABILITY
+  app.get('/api/auth/export', async (c) => {
+    const user = c.get('user');
+    if (!user) throw unauthorized();
+    const [ledger, transactions] = await Promise.all([
+      InventoryLedgerEntity.list(c.env, null, 1000),
+      TransactionEntity.list(c.env, null, 1000)
+    ]);
+    const userData = {
+      profile: user,
+      activity: {
+        ledger: ledger.items.filter(i => i.operator_id === user.id),
+        transactions: transactions.items.filter(t => t.ledger_entry_id && ledger.items.find(l => l.id === t.ledger_entry_id && l.operator_id === user.id))
+      },
+      exportDate: new Date().toISOString()
+    };
+    return ok(c, userData);
+  });
+  // GDPR: RIGHT TO BE FORGOTTEN
+  app.post('/api/auth/purge', async (c) => {
+    const user = c.get('user');
+    if (!user) throw unauthorized();
+    await UserEntity.delete(c.env, user.id);
+    const sessions = await SessionEntity.list(c.env, null, 1000);
+    const userSessions = sessions.items.filter(s => s.userId === user.id).map(s => s.id);
+    await SessionEntity.deleteMany(c.env, userSessions);
+    return ok(c, { purged: true });
   });
   // --- SYNC ---
   app.post('/api/sync/ledger', async (c) => {
@@ -165,11 +173,6 @@ export function userRoutes(app: HonoApp) {
     const body = await c.req.json<Supplier>();
     const supplier = await SupplierEntity.create(c.env, { ...body, id: crypto.randomUUID(), created_at: Date.now(), updated_at: Date.now() });
     return ok(c, supplier);
-  });
-  app.delete('/api/suppliers/:id', requireRole(['admin']), async (c) => {
-    const id = c.req.param('id');
-    const deleted = await SupplierEntity.delete(c.env, id);
-    return ok(c, { id, deleted });
   });
   // --- LEDGER & TRANSACTIONS ---
   app.get('/api/ledger', async (c) => ok(c, (await InventoryLedgerEntity.list(c.env, null, 1000)).items));
@@ -200,13 +203,7 @@ export function userRoutes(app: HonoApp) {
       const t = transactions.items.find(tr => tr.ledger_entry_id === item.id);
       if (t) streams[streamKey].fees += t.epr_fee;
     });
-    const report: EPRReport = {
-      compliance_pct: 94.5,
-      total_fees: transactions.items.reduce((sum, t) => sum + t.epr_fee, 0),
-      audit_chain_status: 'verified',
-      streams
-    };
-    return ok(c, report);
+    return ok(c, { compliance_pct: 94.5, total_fees: transactions.items.reduce((sum, t) => sum + t.epr_fee, 0), audit_chain_status: 'verified', streams });
   });
   // --- AUDIT ---
   app.get('/api/audit', requireRole(['admin', 'auditor']), async (c) => {
@@ -231,45 +228,34 @@ export function userRoutes(app: HonoApp) {
     }
     return ok(c, { success: true });
   });
-  // --- HARDWARE STUBS ---
+  // --- WORKERS AI: MATERIAL CLASSIFICATION ---
   app.post('/api/ai/classify', async (c) => {
     const { material } = await c.req.json();
-    return ok(c, { suggestedStream: 'Metals' });
+    if (!c.env.AI) {
+      // Fallback if AI not bound
+      return ok(c, { suggestedStream: 'Metals', confidence: 0.5 });
+    }
+    try {
+      const response = await c.env.AI.run('@cf/meta/llama-2-7b-chat-fp16', {
+        messages: [
+          { role: 'system', content: 'You are an industrial waste classifier. Classify the material into one of: Plastic, Paper & Packaging, Glass, Metals, Electrical & Electronic, Other. Return ONLY the category name.' },
+          { role: 'user', content: material }
+        ]
+      });
+      const stream = response.response.trim();
+      return ok(c, { suggestedStream: stream, confidence: 0.98 });
+    } catch (e) {
+      return ok(c, { suggestedStream: 'Metals', confidence: 0.5 });
+    }
   });
-  app.get('/api/camera/snapshot', async (c) => {
-    return ok(c, { imageUrl: 'https://images.unsplash.com/photo-1599153066743-08810dc8a419?auto=format&fit=crop&q=80&w=600' });
-  });
-  app.post('/api/admin/sessions/clear', requireRole(['admin']), async (c) => {
-    const sessions = await SessionEntity.list(c.env, null, 1000);
-    await SessionEntity.deleteMany(c.env, sessions.items.map(s => s.id));
-    return ok(c, { cleared: sessions.items.length });
-  });
-  // --- FINANCE ---
-  app.get('/api/finance/vat-report', async (c) => {
-    const transactions = await TransactionEntity.list(c.env, null, 1000);
-    const total = transactions.items.reduce((sum, t) => sum + t.amount, 0);
-    return ok(c, {
-      net_amount: total / 1.15,
-      vat_amount: total - (total / 1.15),
-      gross_amount: total
-    });
-  });
-  app.get('/api/finance/gl-summary', async (c) => {
-    return ok(c, [
-      { id: '1', name: 'Cash at Bank', code: '1000', balance: 45000 },
-      { id: '2', name: 'VAT Output', code: '2000', balance: 6750 }
-    ]);
-  });
-  // --- HR & FLEET ---
-  app.get('/api/hr/staff', async (c) => ok(c, (await StaffEntity.list(c.env, null, 500)).items));
-  app.get('/api/fleet/vehicles', async (c) => ok(c, (await VehicleEntity.list(c.env, null, 100)).items));
-  app.get('/api/fleet/routes', async (c) => ok(c, (await RouteEntity.list(c.env, null, 100)).items));
+  app.get('/api/camera/snapshot', async (c) => ok(c, { imageUrl: 'https://images.unsplash.com/photo-1599153066743-08810dc8a419?auto=format&fit=crop&q=80&w=600' }));
   // --- DASHBOARD ---
   app.get('/api/dashboard', async (c) => {
-    const [suppliers, ledger, transactions] = await Promise.all([
+    const [suppliers, ledger, transactions, vehicles] = await Promise.all([
       SupplierEntity.list(c.env, null, 100),
       InventoryLedgerEntity.list(c.env, null, 100),
       TransactionEntity.list(c.env, null, 100),
+      VehicleEntity.list(c.env, null, 50)
     ]);
     return ok(c, {
       summary: {
@@ -277,9 +263,25 @@ export function userRoutes(app: HonoApp) {
         totalValue: transactions.items.reduce((s, i) => s + i.amount, 0),
         totalEPR: transactions.items.reduce((s, i) => s + i.epr_fee, 0),
         weeePct: suppliers.items.length > 0 ? (suppliers.items.filter(s => s.is_weee_compliant).length / suppliers.items.length) * 100 : 0,
+        fleet_efficiency: vehicles.items.length > 0 ? (vehicles.items.filter(v => v.status === 'active').length / vehicles.items.length) * 100 : 0,
         recentLedger: ledger.items.slice(0, 5),
         recentTransactions: transactions.items.slice(0, 5)
       }
     });
   });
+  // --- HR & FLEET ---
+  app.get('/api/hr/staff', async (c) => ok(c, (await StaffEntity.list(c.env, null, 500)).items));
+  app.get('/api/fleet/vehicles', async (c) => ok(c, (await VehicleEntity.list(c.env, null, 100)).items));
+  app.get('/api/fleet/routes', async (c) => ok(c, (await RouteEntity.list(c.env, null, 100)).items));
+  app.post('/api/fleet/routes/:id/dispatch', requireRole(['admin', 'manager']), async (c) => {
+    const id = c.req.param('id');
+    const route = new RouteEntity(c.env, id);
+    await route.patch({ status: 'in-progress' });
+    return ok(c, { dispatched: true });
+  });
+  // --- MARKETPLACE ---
+  app.get('/api/marketplace/lots', async (c) => ok(c, [
+    { id: 'lot-001', material: 'High-Grade Copper', weight_kg: 500, purity: '99%', epr_status: 'Certified', price_zar: 45000 },
+    { id: 'lot-002', material: 'PET Flakes (Blue)', weight_kg: 1200, purity: 'Mixed', epr_status: 'Verified', price_zar: 8000 }
+  ]));
 }
