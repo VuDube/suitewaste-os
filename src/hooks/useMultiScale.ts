@@ -17,12 +17,24 @@ export function useMultiScale() {
   const disconnect = useCallback(async () => {
     keepReadingRef.current = false;
     if (readerRef.current) {
-      try { await readerRef.current.cancel(); } catch (e) {}
-      try { readerRef.current.releaseLock(); } catch (e) {}
+      try { 
+        await readerRef.current.cancel(); 
+      } catch (e) {
+        console.warn('Reader cancel failed or already closed', e);
+      }
+      try { 
+        readerRef.current.releaseLock(); 
+      } catch (e) {
+        // Lock may already be released
+      }
       readerRef.current = null;
     }
     if (portRef.current) {
-      try { await portRef.current.close(); } catch (e) {}
+      try { 
+        await portRef.current.close(); 
+      } catch (e) {
+        console.error('Failed to close serial port', e);
+      }
       portRef.current = null;
     }
     setStatus('disconnected');
@@ -44,6 +56,8 @@ export function useMultiScale() {
       readerRef.current = reader;
       const decoder = new TextDecoder();
       let buffer = '';
+      // Mock device registration for health checks
+      setDevices([{ id: 'main-scale', name: 'Primary Scale', status: 'connected', lastSeen: Date.now() }]);
       while (keepReadingRef.current) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -51,7 +65,11 @@ export function useMultiScale() {
         const lines = buffer.split(/[\r\n]+/);
         if (lines.length > 1) {
           const match = lines[lines.length - 2].match(/(\d+\.\d+)/);
-          if (match) setWeight(parseFloat(match[1]));
+          if (match) {
+            setWeight(parseFloat(match[1]));
+            // Update health timestamp
+            setDevices(prev => prev.map(d => d.id === 'main-scale' ? { ...d, lastSeen: Date.now(), status: 'parsing' } : d));
+          }
           buffer = lines[lines.length - 1];
         }
       }
@@ -70,7 +88,8 @@ export function useMultiScale() {
     }, 5000);
     return () => {
       clearInterval(interval);
-      disconnect();
+      // Ensure we don't block unmounting
+      disconnect().catch(err => console.error('Cleanup disconnect failed', err));
     };
   }, [status, disconnect]);
   return { weight, status, connect, disconnect, devices };

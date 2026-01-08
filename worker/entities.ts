@@ -1,5 +1,5 @@
-import { IndexedEntity } from "./core-utils";
-import type { Supplier, InventoryLedgerEntry, Transaction, User, Session } from "@shared/types";
+import { IndexedEntity, type Env } from "./core-utils";
+import type { Supplier, InventoryLedgerEntry, Transaction, User, Session, AuditLog } from "@shared/types";
 import { MOCK_SUPPLIERS, MOCK_INVENTORY_LEDGER, MOCK_TRANSACTIONS, MOCK_USERS } from "@shared/mock-data";
 // SESSION ENTITY
 export class SessionEntity extends IndexedEntity<Session> {
@@ -70,7 +70,6 @@ export class UserEntity extends IndexedEntity<User> {
   };
   static seedData = MOCK_USERS;
 }
-
 // AUDIT LOG ENTITY
 export class AuditLogEntity extends IndexedEntity<AuditLog> {
   static readonly entityName = "audit_log";
@@ -85,9 +84,10 @@ export class AuditLogEntity extends IndexedEntity<AuditLog> {
     payload_hash: "0",
     previous_hash: "0",
   };
-
   static async getLatestHash(env: Env): Promise<string> {
     const logs = await this.list(env, null, 1);
+    // Note: list returns items. We sort descending by timestamp normally, 
+    // but the Index helper provides a predictable order.
     return logs.items[0]?.payload_hash || "0000000000000000000000000000000000000000000000000000000000000000";
   }
 }
