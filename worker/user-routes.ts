@@ -1,6 +1,3 @@
-import { Buffer } from 'buffer';
-globalThis.Buffer = Buffer;
-
 import { Hono } from "hono";
 import type { Context, Next } from 'hono';
 import { 
@@ -27,10 +24,40 @@ import type {
   ApiResponse
 } from "@shared/types";
 import { HTTPException } from "hono/http-exception";
-import jwt from 'jsonwebtoken';
 // Note: bcryptjs is avoided in Worker entry due to node:crypto issues in some environments.
 // We assume password verification is handled or mocked for this phase's logic.
 const JWT_SECRET = 'suitewaste-enterprise-v1-secret-key';
+
+function base64urlDecode(str: string): Uint8Array {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
+  return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+}
+
+async function verifyJwt(token: string, secret: string): Promise<any> {
+  const [headerB64, payloadB64, sigB64] = token.split('.');
+  if (!headerB64 || !payloadB64 || !sigB64) throw new Error('Invalid token');
+  
+  const headerBytes = base64urlDecode(headerB64);
+  const header = JSON.parse(new TextDecoder().decode(headerBytes));
+  if (header.alg !== 'HS256') throw new Error('Unsupported algorithm');
+  
+  const data = `${headerB64}.${payloadB64}`;
+  const key = await crypto.subtle.importKey(
+    'raw', 
+    new TextEncoder().encode(secret), 
+    { name: 'HMAC', hash: 'SHA-256' }, 
+    false, 
+    ['verify']
+  );
+  const signature = base64urlDecode(sigB64);
+  const valid = await crypto.subtle.verify('HMAC', key, signature, new TextEncoder().encode(data));
+  
+  if (!valid) throw new Error('Invalid signature');
+  
+  const payloadBytes = base64urlDecode(payloadB64);
+  return JSON.parse(new TextDecoder().decode(payloadBytes));
+}
 export interface Env {
   GlobalDurableObject: DurableObjectNamespace<any>;
   AI?: any;
@@ -72,7 +99,7 @@ export function userRoutes(app: HonoApp) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) throw unauthorized();
     const token = authHeader.split(' ')[1];
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const decoded = await verifyJwt(token, JWT_SECRET);
       const user = await new UserEntity(c.env, decoded.userId).getState();
       if (!user || !user.id || !user.active) throw unauthorized();
       c.set('user', user);
