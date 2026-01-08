@@ -1,16 +1,19 @@
+import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { GlobalNav } from '@/components/GlobalNav';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 type PageLayoutProps = {
   children: React.ReactNode;
+  fullBleed?: boolean;
 };
-export function PageLayout({ children }: PageLayoutProps) {
+export function PageLayout({ children, fullBleed = false }: PageLayoutProps) {
   const { user, isLoading } = useAuth();
   if (isLoading) {
     return (
       <div className="h-dvh w-full flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
@@ -18,15 +21,20 @@ export function PageLayout({ children }: PageLayoutProps) {
     return <Navigate to="/login" replace />;
   }
   return (
-    <div className="h-dvh flex flex-col bg-background text-foreground overflow-hidden md:min-h-screen md:overflow-auto">
+    <div className="h-dvh flex flex-col bg-background text-foreground overflow-hidden">
+      {/* Top Safe Area Spacer for Header/Notch */}
+      <div className="h-[env(safe-area-inset-top)] bg-background/95 sticky top-0 z-50" />
       <GlobalNav />
-      <main className="flex-1 overflow-y-auto pb-24 md:pb-12 relative z-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-8 md:py-10 lg:py-12">
-            {children}
-          </div>
+      <main className="flex-1 overflow-y-auto pb-[max(80px,env(safe-area-inset-bottom))] relative z-0 scrollbar-hide">
+        <div className={cn(
+          "mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10",
+          !fullBleed && "max-w-7xl"
+        )}>
+          {children}
         </div>
       </main>
+      {/* Bottom Safe Area Spacer */}
+      <div className="h-[env(safe-area-inset-bottom)] bg-background/95 fixed bottom-0 w-full z-40 pointer-events-none" />
     </div>
   );
 }

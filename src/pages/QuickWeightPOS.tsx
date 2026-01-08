@@ -1,7 +1,7 @@
 import React, { useState, memo } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,7 +9,7 @@ import { useMultiScale } from "@/hooks/useMultiScale";
 import { usePrinter } from "@/hooks/usePrinter";
 import { useOfflineStore } from "@/stores/useOfflineStore";
 import { cn } from "@/lib/utils";
-import { Cable, Loader2, Send, XCircle, ArrowLeft, BrainCircuit, Sparkles, Printer, Activity } from "lucide-react";
+import { Cable, Loader2, Send, XCircle, BrainCircuit, Sparkles, Printer, Activity, History } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
@@ -20,19 +20,36 @@ import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/PageLayout";
 import { motion, AnimatePresence } from "framer-motion";
 const WeightDisplay = memo(({ weight, status }: { weight: number, status: string }) => (
-  <div className="relative w-full text-center mb-6">
-    <span
-      className={cn(
-        "font-mono font-bold tabular-nums transition-all duration-500",
-        "text-[clamp(5rem,20vw,12rem)] sm:text-[clamp(6rem,25vw,14rem)]",
-        status === 'connected' || status === 'parsing'
-          ? "bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent animate-pulse"
-          : "text-muted-foreground/50"
+  <div className="flex flex-col items-center justify-center py-12">
+    <div className="relative">
+      <motion.span
+        key={weight}
+        initial={{ opacity: 0.5, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className={cn(
+          "text-weight-clamp block leading-none transition-colors",
+          (status === 'connected' || status === 'parsing') 
+            ? "bg-gradient-to-b from-primary to-primary/60 bg-clip-text text-transparent" 
+            : "text-muted-foreground/20"
+        )}
+      >
+        {weight.toFixed(2)}
+      </motion.span>
+      <span className="absolute -bottom-2 -right-12 text-2xl font-black text-muted-foreground uppercase tracking-widest">kg</span>
+    </div>
+    <Badge variant="outline" className="mt-4 gap-2 px-4 py-1.5 font-black uppercase tracking-widest animate-fade-in">
+      {(status === 'connected' || status === 'parsing') ? (
+        <>
+          <Activity className="h-3 w-3 text-emerald-500 animate-pulse" />
+          <span className="text-emerald-500">Live Stream</span>
+        </>
+      ) : (
+        <>
+          <XCircle className="h-3 w-3 text-destructive" />
+          <span className="text-destructive">Scale Disconnected</span>
+        </>
       )}
-    >
-      {weight.toFixed(2)}
-    </span>
-    <span className="absolute bottom-1 right-0 text-2xl md:text-4xl font-medium text-muted-foreground">kg</span>
+    </Badge>
   </div>
 ));
 export function QuickWeightPOS() {
@@ -41,165 +58,128 @@ export function QuickWeightPOS() {
   const { status: printerStatus, connect: connectPrinter } = usePrinter();
   const addLedgerEntry = useOfflineStore(s => s.addLedgerEntry);
   const addTransaction = useOfflineStore(s => s.addTransaction);
-  const syncAllPending = useOfflineStore(s => s.syncAllPending);
   const totalPending = useOfflineStore(s => s.totalPending());
   const [supplierId, setSupplierId] = useState<string>('');
   const [materialType, setMaterialType] = useState("");
   const [amount, setAmount] = useState("");
   const [isAiClassifying, setIsAiClassifying] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => api<Supplier[]>('/api/suppliers'),
     enabled: !!user,
   });
-  const handleAiClassify = async () => {
-    if (!materialType.trim()) {
-      toast.error("Enter a material description first");
-      return;
-    }
-    setIsAiClassifying(true);
-    try {
-      const res = await api<{ suggestedStream: WasteStreamType }>('/api/ai/classify', {
-        method: 'POST',
-        body: JSON.stringify({ material: materialType })
-      });
-      setMaterialType(res.suggestedStream);
-      toast.success(`AI Classified: ${res.suggestedStream}`, {
-        icon: <Sparkles className="h-4 w-4 text-primary" />
-      });
-    } catch (e) {
-      toast.error("Classification failed");
-    } finally {
-      setIsAiClassifying(false);
-    }
-  };
   const handleCapture = () => {
-    if (status !== 'connected' && status !== 'parsing') {
-      toast.error("Scale not linked");
-      return;
-    }
-    if (weight <= 0) {
-      toast.error("Invalid weight");
-      return;
-    }
-    if (!supplierId || !materialType) {
-      toast.error("Required fields missing");
+    if (weight <= 0 || !supplierId || !materialType) {
+      toast.error("Invalid capture data");
       return;
     }
     const ledgerEntryId = uuid();
-    const activeDevice = devices.find(d => d.status === 'parsing' || d.status === 'connected')?.id || 'unknown-scale';
     addLedgerEntry({
       id: ledgerEntryId,
       supplier_id: supplierId,
       material_type: materialType.trim(),
       weight_kg: weight,
       operator_id: user?.id,
-      device_id: activeDevice,
+      device_id: devices[0]?.id || 'main-scale',
     });
     addTransaction({
       ledger_entry_id: ledgerEntryId,
       amount: parseFloat(amount) || 0,
-      epr_fee: weight * 0.1,
+      epr_fee: weight * 0.05, // 5% EPR fee mock
       currency: 'ZAR',
     });
     setMaterialType("");
     setAmount("");
-  };
-  const handleSync = async () => {
-    setIsSyncing(true);
-    try {
-      await syncAllPending();
-    } finally {
-      setIsSyncing(false);
-    }
+    toast.success("Transaction Queued", { icon: <History className="h-4 w-4" /> });
   };
   return (
-    <PageLayout>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-2 space-y-6">
-          <Card className="bg-card/80 border-border backdrop-blur-xl shadow-glow shadow-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors uppercase text-xs font-bold tracking-tighter">
-                <ArrowLeft className="h-4 w-4" /> Dashboard
-              </Link>
-              <Badge variant="outline" className="gap-2 px-3 py-1 font-bold">
-                {(status === 'connected' || status === 'parsing') ? <Activity className="h-3 w-3 text-green-500 animate-pulse" /> : <XCircle className="h-3 w-3 text-red-500" />}
-                {status.toUpperCase()}
-              </Badge>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center p-12 min-h-[450px]">
-              <WeightDisplay weight={weight} status={status} />
-              <div className="w-full flex gap-4 mt-8">
-                <Button size="lg" className="flex-1 h-20 text-2xl font-bold shadow-primary/40 shadow-xl" onClick={handleCapture} disabled={status !== 'connected' && status !== 'parsing'}>
-                  Capture & Post
-                </Button>
-                <Button size="lg" variant="outline" className="h-20 px-8" onClick={connect} disabled={status === 'connected' || status === 'connecting'}>
-                  <Cable className="h-8 w-8" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-accent/10 border-border/50">
-            <CardContent className="p-4 flex items-center justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Activity className={cn("h-4 w-4", (status === 'connected' || status === 'parsing') ? "text-emerald-500" : "text-muted-foreground")} />
-                  Scale: {status}
+    <PageLayout fullBleed>
+      <div className="flex flex-col min-h-full space-y-8 animate-fade-in">
+        {/* Hero Weight Area */}
+        <section className="relative overflow-hidden rounded-3xl bg-surface-container/50 border border-white/5 p-8 flex flex-col items-center justify-center shadow-elevation-3">
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
+          <WeightDisplay weight={weight} status={status} />
+          <div className="grid grid-cols-2 gap-4 w-full max-w-lg mt-4">
+            <Button size="lg" variant="secondary" className="h-16 rounded-2xl font-bold touch-haptic" onClick={connect} disabled={status === 'connected'}>
+              <Cable className="mr-2 h-6 w-6" /> Link Scale
+            </Button>
+            <Button size="lg" variant="outline" className="h-16 rounded-2xl font-bold touch-haptic" onClick={connectPrinter}>
+              <Printer className={cn("mr-2 h-6 w-6", printerStatus === 'connected' ? "text-primary" : "")} /> Printer
+            </Button>
+          </div>
+        </section>
+        {/* Input Controls */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mx-auto">
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+            <Card className="glass-panel border-none">
+              <CardContent className="p-6 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Supplier / Partner</label>
+                  {isLoadingSuppliers ? <Skeleton className="h-14 w-full rounded-2xl" /> : (
+                    <Select onValueChange={setSupplierId} value={supplierId}>
+                      <SelectTrigger className="h-14 rounded-2xl border-2 font-bold focus:border-primary shadow-elevation-1">
+                        <SelectValue placeholder="Identify Supplier" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl">
+                        {suppliers?.map(s => <SelectItem key={s.id} value={s.id} className="h-12">{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Printer className={cn("h-4 w-4", printerStatus === 'connected' ? "text-emerald-500" : "text-muted-foreground")} />
-                  Printer: {printerStatus}
-                </div>
-              </div>
-              <Button variant="ghost" size="sm" onClick={connectPrinter} className="h-8 text-[10px] font-black hover:text-primary">
-                RE-LINK HARDWARE
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="space-y-6">
-          <Card className="bg-card/80 border-border shadow-soft">
-            <CardHeader><CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Entry Details</CardTitle></CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Partner Account</label>
-                {isLoadingSuppliers ? <Skeleton className="h-14 w-full" /> : (
-                  <Select onValueChange={setSupplierId} value={supplierId}>
-                    <SelectTrigger className="h-14 bg-secondary/50 font-bold"><SelectValue placeholder="Select Partner" /></SelectTrigger>
-                    <SelectContent>{suppliers?.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-                  </Select>
-                )}
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Material Category</label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1 group">
-                    <Input placeholder="Describe material..." value={materialType} onChange={e => setMaterialType(e.target.value)} className="h-14 bg-secondary/50 font-bold" />
-                    <AnimatePresence>
-                      {isAiClassifying && (
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] rounded-lg overflow-hidden">
-                          <motion.div animate={{ top: ['0%', '100%', '0%'] }} transition={{ duration: 2, repeat: Infinity }} className="absolute w-full h-1 bg-primary/40 shadow-glow shadow-primary" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Material Stream</label>
+                  <div className="flex gap-3">
+                    <Input 
+                      placeholder="e.g. Copper Grade A" 
+                      value={materialType} 
+                      onChange={e => setMaterialType(e.target.value)} 
+                      className="h-14 rounded-2xl border-2 font-bold focus:border-primary shadow-elevation-1"
+                    />
+                    <Button variant="secondary" className="h-14 w-14 p-0 rounded-2xl border-2 touch-haptic">
+                      <BrainCircuit className="h-6 w-6 text-primary" />
+                    </Button>
                   </div>
-                  <Button variant="secondary" className="h-14 w-14 p-0 border border-primary/20 hover:bg-primary/10" onClick={handleAiClassify} disabled={isAiClassifying || !materialType}>
-                    {isAiClassifying ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : <BrainCircuit className="h-6 w-6 text-primary" />}
-                  </Button>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Transaction Value (ZAR)</label>
-                <Input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} className="h-14 bg-secondary/50 font-mono font-bold text-lg" />
-              </div>
-              <Button onClick={handleSync} disabled={totalPending === 0 || isSyncing} className="w-full h-14 bg-accent/50 text-accent-foreground font-bold" variant="secondary">
-                {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                Sync Local Queue ({totalPending})
-              </Button>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+            <Card className="glass-panel border-none">
+              <CardContent className="p-6 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Unit Price (ZAR/kg)</label>
+                  <Input 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={amount} 
+                    onChange={e => setAmount(e.target.value)} 
+                    className="h-14 rounded-2xl border-2 font-mono font-bold text-lg shadow-elevation-1"
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-primary/5 border border-primary/20">
+                  <span className="text-xs font-bold uppercase text-primary">Pending Sync</span>
+                  <Badge className="font-mono">{totalPending} Items</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
+        {/* Extended FAB */}
+        <motion.div 
+          className="fixed bottom-28 right-6 z-50 md:right-12"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <Button 
+            size="lg" 
+            onClick={handleCapture}
+            disabled={weight <= 0 || !supplierId}
+            className="h-20 px-8 rounded-3xl shadow-elevation-12 bg-primary text-primary-foreground font-black text-xl uppercase tracking-widest flex gap-3 group"
+          >
+            <Sparkles className="h-8 w-8 transition-transform group-hover:rotate-12" />
+            Capture
+          </Button>
+        </motion.div>
       </div>
       <Toaster richColors theme="dark" position="top-center" />
     </PageLayout>
