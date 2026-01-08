@@ -62,7 +62,6 @@ export interface Transaction {
   is_synced: boolean;
   created_at: number;
 }
-// --- Enterprise v1.0 Extensions ---
 export interface StaffMember {
   id: string;
   name: string;
@@ -113,7 +112,6 @@ export interface EPRReport {
   compliance_pct: number;
   total_fees: number;
   audit_chain_status: 'verified' | 'tampered' | 'pending';
-  regulation_metadata: string;
   streams: Record<WasteStreamType, EPRStreamData>;
 }
 export type ConfigUserUpdate = Pick<User, 'id' | 'role' | 'active' | 'features'>;

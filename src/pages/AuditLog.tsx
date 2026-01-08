@@ -25,13 +25,20 @@ export function AuditLog() {
           icon: <ShieldCheck className="h-5 w-5 text-emerald-500" />
         });
       } else {
-        toast.error(`CHAIN TAMPERED: ${res.reason} at block ${res.blockId}`, {
+        toast.error(`CHAIN TAMPERED: ${res.reason} at block ${res.blockId?.substring(0,8)}`, {
           duration: 10000,
           icon: <ShieldAlert className="h-5 w-5 text-destructive" />
         });
       }
     }
   });
+  const parseDetails = (details?: string) => {
+    try {
+      return details ? JSON.parse(details) : {};
+    } catch (e) {
+      return { raw: details };
+    }
+  };
   return (
     <PageLayout>
       <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -71,7 +78,7 @@ export function AuditLog() {
                   {isLoading ? (
                     <TableRow><TableCell colSpan={5} className="text-center py-20"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                   ) : data?.items.map((log) => (
-                    <TableRow key={log.id} className="group hover:bg-accent/5">
+                    <TableRow key={log.id} className="group hover:bg-accent/5 transition-colors">
                       <TableCell className="text-xs font-mono">{format(log.timestamp, 'yyyy-MM-dd HH:mm:ss.SSS')}</TableCell>
                       <TableCell>
                         <Badge variant={log.action === 'delete' ? 'destructive' : 'outline'} className="uppercase text-[10px] font-bold">
@@ -88,15 +95,15 @@ export function AuditLog() {
                           <DialogTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 font-semibold">Inspect</Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-2xl bg-card">
+                          <DialogContent className="max-w-2xl bg-card border-border shadow-2xl">
                             <DialogHeader><DialogTitle>Block Verification Details</DialogTitle></DialogHeader>
                             <div className="space-y-4">
-                              <div className="p-4 bg-muted/50 border rounded-lg font-mono text-xs overflow-auto max-h-[60vh]">
-                                <pre>{JSON.stringify(JSON.parse(log.details || '{}'), null, 2)}</pre>
+                              <div className="p-4 bg-muted/30 border rounded-lg font-mono text-xs overflow-auto max-h-[50vh]">
+                                <pre>{JSON.stringify(parseDetails(log.details), null, 2)}</pre>
                               </div>
-                              <div className="grid grid-cols-1 gap-4 text-[10px] font-mono border-t pt-4">
-                                <div className="space-y-1"><p className="text-muted-foreground">PREVIOUS_HASH</p><p className="break-all bg-accent/20 p-1">{log.previous_hash}</p></div>
-                                <div className="space-y-1"><p className="text-emerald-500 font-bold">CURRENT_BLOCK_HASH</p><p className="break-all bg-emerald-500/5 p-1">{log.payload_hash}</p></div>
+                              <div className="grid grid-cols-1 gap-4 text-[10px] font-mono border-t border-border/50 pt-4">
+                                <div className="space-y-1"><p className="text-muted-foreground uppercase">Previous Hash</p><p className="break-all bg-accent/20 p-2 rounded">{log.previous_hash}</p></div>
+                                <div className="space-y-1"><p className="text-emerald-500 font-bold uppercase">Current Block Hash</p><p className="break-all bg-emerald-500/5 p-2 rounded border border-emerald-500/10">{log.payload_hash}</p></div>
                               </div>
                             </div>
                           </DialogContent>
@@ -104,14 +111,14 @@ export function AuditLog() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {data?.items.length === 0 && (
+                  {!isLoading && data?.items.length === 0 && (
                     <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">No audit logs found.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
             {data?.next && (
-              <Button variant="outline" className="w-full mt-4 h-12" onClick={() => setCursor(data.next)}>Fetch Older Blocks</Button>
+              <Button variant="outline" className="w-full mt-4 h-12 font-bold" onClick={() => setCursor(data.next)}>Fetch Older Blocks</Button>
             )}
           </CardContent>
         </Card>
