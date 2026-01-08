@@ -1,7 +1,5 @@
 import { Hono } from "hono";
 import type { Context, Next } from 'hono';
-import { Buffer } from 'buffer';
-(globalThis as any).Buffer = Buffer;
 import {
   SupplierEntity,
   InventoryLedgerEntity,
@@ -97,7 +95,7 @@ export function userRoutes(app: HonoApp) {
   app.post('/api/auth/login', async (c) => {
     const { username, password } = await c.req.json();
     const users = await UserEntity.list(c.env, null, 100);
-    const user = users.items.find(u => u.username === username && u.password_hash === password);
+    const user = (users?.items || []).find(u => u.username === username && u.password_hash === password);
     if (!user || !user.active) return bad(c, 'Invalid credentials');
     const sessionId = crypto.randomUUID();
     await SessionEntity.create(c.env, { id: sessionId, userId: user.id, createdAt: Date.now() });
@@ -131,7 +129,10 @@ export function userRoutes(app: HonoApp) {
     return ok(c, { syncedIds });
   });
   // --- SUPPLIERS ---
-  app.get('/api/suppliers', async (c) => ok(c, (await SupplierEntity.list(c.env, null, 1000)).items));
+  app.get('/api/suppliers', async (c) => {
+    const result = await SupplierEntity.list(c.env, null, 1000);
+    return ok(c, result?.items || []);
+  });
   app.post('/api/suppliers', requireRole(['admin', 'manager']), async (c) => {
     const body = await c.req.json<Supplier>();
     const supplier = await SupplierEntity.create(c.env, { ...body, id: crypto.randomUUID(), created_at: Date.now(), updated_at: Date.now() });
@@ -143,22 +144,32 @@ export function userRoutes(app: HonoApp) {
     return ok(c, { id, deleted });
   });
   // --- LEDGER & TRANSACTIONS ---
-  app.get('/api/ledger', async (c) => ok(c, (await InventoryLedgerEntity.list(c.env, null, 1000)).items));
-  app.get('/api/transactions', async (c) => ok(c, (await TransactionEntity.list(c.env, null, 1000)).items));
+  app.get('/api/ledger', async (c) => {
+    const result = await InventoryLedgerEntity.list(c.env, null, 1000);
+    return ok(c, result?.items || []);
+  });
+  app.get('/api/transactions', async (c) => {
+    const result = await TransactionEntity.list(c.env, null, 1000);
+    return ok(c, result?.items || []);
+  });
   // --- FINANCE ---
   app.get('/api/finance/vat-report', async (c) => {
     const transactions = await TransactionEntity.list(c.env, null, 1000);
-    const totalGross = transactions.items.reduce((sum, t) => sum + t.amount, 0);
+    const items = transactions?.items || [];
+    const totalGross = items.reduce((sum, t) => sum + (t.amount || 0), 0);
     const netAmount = totalGross / 1.15;
     const vatAmount = totalGross - netAmount;
     return ok(c, { net_amount: netAmount, vat_amount: vatAmount, gross_amount: totalGross });
   });
   app.get('/api/finance/gl-summary', async (c) => {
     const accounts = await GLAccountEntity.list(c.env, null, 100);
-    return ok(c, accounts.items);
+    return ok(c, accounts?.items || []);
   });
   // --- HR STAFF ---
-  app.get('/api/hr/staff', requireRole(['admin', 'manager']), async (c) => ok(c, (await StaffEntity.list(c.env, null, 500)).items));
+  app.get('/api/hr/staff', requireRole(['admin', 'manager']), async (c) => {
+    const result = await StaffEntity.list(c.env, null, 500);
+    return ok(c, result?.items || []);
+  });
   app.post('/api/hr/staff', requireRole(['admin', 'manager']), async (c) => {
     const body = await c.req.json<StaffMember>();
     const staff = await StaffEntity.create(c.env, { ...body, id: crypto.randomUUID(), last_seen: Date.now() });
@@ -172,7 +183,10 @@ export function userRoutes(app: HonoApp) {
     return ok(c, await inst.getState());
   });
   // --- PRODUCERS ---
-  app.get('/api/producers/requests', async (c) => ok(c, (await ProducerRequestEntity.list(c.env, null, 100)).items));
+  app.get('/api/producers/requests', async (c) => {
+    const result = await ProducerRequestEntity.list(c.env, null, 100);
+    return ok(c, result?.items || []);
+  });
   // --- WORKERS AI: MATERIAL CLASSIFICATION ---
   app.post('/api/ai/classify', async (c) => {
     const { material } = await c.req.json();
@@ -199,19 +213,29 @@ export function userRoutes(app: HonoApp) {
       TransactionEntity.list(c.env, null, 100),
       VehicleEntity.list(c.env, null, 50)
     ]);
+    const suppliersItems = suppliers?.items || [];
+    const ledgerItems = ledger?.items || [];
+    const transactionsItems = transactions?.items || [];
+    const vehiclesItems = vehicles?.items || [];
     return ok(c, {
       summary: {
-        totalWeight: ledger.items.reduce((s, i) => s + i.weight_kg, 0),
-        totalValue: transactions.items.reduce((s, i) => s + i.amount, 0),
-        totalEPR: transactions.items.reduce((s, i) => s + i.epr_fee, 0),
-        weeePct: suppliers.items.length > 0 ? (suppliers.items.filter(s => s.is_weee_compliant).length / suppliers.items.length) * 100 : 0,
-        fleet_efficiency: vehicles.items.length > 0 ? (vehicles.items.filter(v => v.status === 'active').length / vehicles.items.length) * 100 : 0,
+        totalWeight: ledgerItems.reduce((s, i) => s + (i.weight_kg || 0), 0),
+        totalValue: transactionsItems.reduce((s, i) => s + (i.amount || 0), 0),
+        totalEPR: transactionsItems.reduce((s, i) => s + (i.epr_fee || 0), 0),
+        weeePct: suppliersItems.length > 0 ? (suppliersItems.filter(s => s.is_weee_compliant).length / suppliersItems.length) * 100 : 0,
+        fleet_efficiency: vehiclesItems.length > 0 ? (vehiclesItems.filter(v => v.status === 'active').length / vehiclesItems.length) * 100 : 0,
       }
     });
   });
   // --- FLEET ---
-  app.get('/api/fleet/vehicles', async (c) => ok(c, (await VehicleEntity.list(c.env, null, 100)).items));
-  app.get('/api/fleet/routes', async (c) => ok(c, (await RouteEntity.list(c.env, null, 100)).items));
+  app.get('/api/fleet/vehicles', async (c) => {
+    const result = await VehicleEntity.list(c.env, null, 100);
+    return ok(c, result?.items || []);
+  });
+  app.get('/api/fleet/routes', async (c) => {
+    const result = await RouteEntity.list(c.env, null, 100);
+    return ok(c, result?.items || []);
+  });
   app.post('/api/fleet/routes/:id/dispatch', requireRole(['admin', 'manager']), async (c) => {
     const id = c.req.param('id');
     const route = new RouteEntity(c.env, id);
