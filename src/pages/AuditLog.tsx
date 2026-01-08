@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ShieldCheck, ShieldAlert, History, Loader2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -96,7 +96,10 @@ export function AuditLog() {
                             <Button variant="ghost" size="sm" className="h-8 font-semibold">Inspect</Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-2xl bg-card border-border shadow-2xl">
-                            <DialogHeader><DialogTitle>Block Verification Details</DialogTitle></DialogHeader>
+                            <DialogHeader>
+                              <DialogTitle>Block Verification Details</DialogTitle>
+                              <DialogDescription className="text-muted-foreground">Review detailed audit block data including JSON payload, previous hash, and current block hash for chain integrity.</DialogDescription>
+                            </DialogHeader>
                             <div className="space-y-4">
                               <div className="p-4 bg-muted/30 border rounded-lg font-mono text-xs overflow-auto max-h-[50vh]">
                                 <pre>{JSON.stringify(parseDetails(log.details), null, 2)}</pre>

@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { BarChart, PieChart, ResponsiveContainer, Bar, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { CheckCircle, CircleDashed } from 'lucide-react';
+import { CheckCircle, CircleDashed, Filter } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 const COLORS = ['#38761d', '#5a9a47', '#7cb870', '#a0d69a', '#c5f4c3'];
 const PAGE_SIZE = 10;
@@ -68,14 +70,36 @@ export function InventoryLedger() {
           <CardHeader>
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
               <CardTitle>All Entries</CardTitle>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:flex gap-2 w-full">
-                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full sm:w-auto h-14" />
-                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full sm:w-auto h-14" />
-                <Input placeholder="Filter by material..." value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="w-full sm:w-auto h-14" />
-                {isLoadingSuppliers ? <Skeleton className="h-14 w-full sm:w-[180px]" /> : (
-                  <Select value={supplierFilter} onValueChange={setSupplierFilter}><SelectTrigger className="w-full sm:w-[180px] h-14"><SelectValue placeholder="Filter by supplier" /></SelectTrigger><SelectContent><SelectItem value="all">All Suppliers</SelectItem>{suppliers?.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>
-                )}
-              </div>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2 h-14 px-6 font-medium md:w-auto w-full order-first md:order-none">
+                    <Filter className="h-4 w-4" />
+                    Filters
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md sm:max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>Filter Entries</DialogTitle>
+                    <DialogDescription>Set date range, material type, and supplier to narrow down ledger results.</DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 grid grid-cols-1 gap-3 space-y-0">
+                    <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full h-12" />
+                    <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full h-12" />
+                    <Input placeholder="Filter by material..." value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="w-full h-12" />
+                    {isLoadingSuppliers ? <Skeleton className="h-12 w-full" /> : (
+                      <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                        <SelectTrigger className="w-full h-12">
+                          <SelectValue placeholder="Filter by supplier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Suppliers</SelectItem>
+                          {suppliers?.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardHeader>
           <CardContent>

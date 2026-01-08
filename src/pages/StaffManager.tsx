@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
@@ -73,7 +73,10 @@ export function StaffManager() {
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Register New Personnel</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>Register New Personnel</DialogTitle>
+                <DialogDescription className="text-muted-foreground">Provide employee details, secure PIN, and role for operational access and shift tracking.</DialogDescription>
+              </DialogHeader>
               <form className="space-y-4 pt-4" onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
@@ -104,6 +107,7 @@ export function StaffManager() {
                         <SelectItem value="manager">Manager</SelectItem>
                       </SelectContent>
                     </Select>
+                    <input type="hidden" name="role" defaultValue="operator" />
                   </div>
                 </div>
                 <Button type="submit" className="w-full h-14 text-lg font-bold mt-2" disabled={createMutation.isPending}>
