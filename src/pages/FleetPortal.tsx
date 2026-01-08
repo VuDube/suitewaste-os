@@ -5,10 +5,9 @@ import { api } from '@/lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Truck, MapPin, Tool, Activity, Loader2, Navigation } from 'lucide-react';
+import { Truck, MapPin, Wrench, Activity, Loader2, Navigation } from 'lucide-react';
 import type { Vehicle, CollectionRoute } from '@shared/types';
 import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
 export function FleetPortal() {
   const { data: vehicles, isLoading: vLoading } = useQuery({ queryKey: ['vehicles'], queryFn: () => api<Vehicle[]>('/api/fleet/vehicles') });
   const { data: routes, isLoading: rLoading } = useQuery({ queryKey: ['routes'], queryFn: () => api<CollectionRoute[]>('/api/fleet/routes') });
@@ -40,7 +39,10 @@ export function FleetPortal() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-bold font-mono">{v.registration}</div>
-                  <p className="text-xs text-muted-foreground uppercase font-bold mt-1">{v.model}</p>
+                  <p className="text-xs text-muted-foreground uppercase font-bold mt-1 flex items-center gap-2">
+                    {v.model}
+                    {v.status === 'maintenance' && <Wrench className="h-3 w-3 text-orange-500" />}
+                  </p>
                   <div className="mt-4 flex items-center justify-between text-xs font-bold">
                     <span>CAPACITY:</span>
                     <span className="text-primary">{v.capacity_kg}kg</span>
@@ -67,7 +69,7 @@ export function FleetPortal() {
                   <TableBody>
                     {routes?.length ? routes.map(r => (
                       <TableRow key={r.id}>
-                        <TableCell className="font-mono text-xs">{r.id}</TableCell>
+                        <TableCell className="font-mono text-xs">{r.id.substring(0, 8)}</TableCell>
                         <TableCell className="font-bold">{vehicles?.find(v => v.id === r.vehicle_id)?.registration}</TableCell>
                         <TableCell>
                           <div className="flex -space-x-1">
@@ -99,7 +101,9 @@ export function FleetPortal() {
               </div>
               <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/10">
                 <div className="text-xs font-bold text-muted-foreground uppercase mb-1">Maintenance Alerts</div>
-                <div className="text-2xl font-bold text-orange-500">1 Vehicle</div>
+                <div className="text-2xl font-bold text-orange-500">
+                  {vehicles?.filter(v => v.status === 'maintenance').length || 0} Vehicles
+                </div>
               </div>
             </CardContent>
           </Card>

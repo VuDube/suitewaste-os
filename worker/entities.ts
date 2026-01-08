@@ -1,8 +1,8 @@
 import { IndexedEntity, type Env } from "./core-utils";
-import type { 
-  Supplier, InventoryLedgerEntry, Transaction, User, Session, AuditLog, 
-  StaffMember, GLAccount, GLEntry, Vehicle, CollectionRoute, 
-  MarketplaceOrder, ProducerDisposalRequest, Timesheet 
+import type {
+  Supplier, InventoryLedgerEntry, Transaction, User, Session, AuditLog,
+  StaffMember, GLAccount, GLEntry, Vehicle, CollectionRoute,
+  MarketplaceOrder, ProducerDisposalRequest, Timesheet
 } from "@shared/types";
 import { MOCK_SUPPLIERS, MOCK_INVENTORY_LEDGER, MOCK_TRANSACTIONS, MOCK_USERS } from "@shared/mock-data";
 export class SessionEntity extends IndexedEntity<Session> {
@@ -43,7 +43,7 @@ export class VehicleEntity extends IndexedEntity<Vehicle> {
   static readonly entityName = "vehicle";
   static readonly indexName = "vehicles";
   static readonly initialState: Vehicle = { id: "", registration: "", model: "", status: "idle", capacity_kg: 0, last_service: 0 };
-  static seedData = [
+  static seedData: ReadonlyArray<Vehicle> = [
     { id: "v-001", registration: "CA 123-456", model: "Isuzu NPR 400", status: "active", capacity_kg: 4000, last_service: Date.now() },
     { id: "v-002", registration: "GP 987-654", model: "Hino 300", status: "idle", capacity_kg: 3000, last_service: Date.now() }
   ];

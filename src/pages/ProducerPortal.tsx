@@ -4,12 +4,13 @@ import { PageLayout } from '@/components/PageLayout';
 import { api } from '@/lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Factory, Leaf, FileCheck, History, BarChart3, PlusCircle } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { motion } from 'framer-motion';
 const mockTrend = [
-  { date: 'Mon', kg: 450 }, { date: 'Tue', kg: 1200 }, { date: 'Wed', kg: 800 }, 
+  { date: 'Mon', kg: 450 }, { date: 'Tue', kg: 1200 }, { date: 'Wed', kg: 800 },
   { date: 'Thu', kg: 1600 }, { date: 'Fri', kg: 900 }, { date: 'Sat', kg: 2100 },
 ];
 export function ProducerPortal() {
@@ -78,14 +79,16 @@ export function ProducerPortal() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {requests?.map(r => (
+                    {requests?.length ? requests.map(r => (
                       <TableRow key={r.id}>
                         <TableCell className="text-xs">{new Date(r.request_date).toLocaleDateString()}</TableCell>
                         <TableCell className="font-bold">{r.material_type}</TableCell>
                         <TableCell className="font-mono">{r.estimated_weight}kg</TableCell>
                         <TableCell><Badge variant="outline" className="uppercase text-[10px]">{r.status}</Badge></TableCell>
                       </TableRow>
-                    ))}
+                    )) : (
+                      <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic">No history found.</TableCell></TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>

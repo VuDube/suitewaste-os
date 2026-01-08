@@ -62,7 +62,7 @@ const UserRolesTable = memo(() => {
       <CardContent>
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Role</TableHead><TableHead>Active</TableHead><TableHead>Features (Comma Separated)</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Role</TableHead><TableHead>Active</TableHead><TableHead>Features</TableHead></TableRow></TableHeader>
             <TableBody>
               {users?.map(u => (
                 <TableRow key={u.id}>
@@ -89,123 +89,25 @@ const UserRolesTable = memo(() => {
     </Card>
   );
 });
-const RegulationMetadataCard = memo(() => (
-  <Card className="bg-card/80 border-border">
-    <CardHeader>
-      <CardTitle>Regulation Metadata</CardTitle>
-    </CardHeader>
-    <CardContent className="space-y-4">
-      <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
-        <div className="flex justify-between items-center">
-          <span className="text-sm font-bold">Active Framework</span>
-          <Badge className="bg-primary text-white">GovGaz43956 (SA EPR)</Badge>
-        </div>
-        <p className="text-xs text-muted-foreground mt-2">Compliance reporting is mapped to Section 18 of the National Environmental Management: Waste Act.</p>
-      </div>
-      <div className="space-y-2">
-        <label className="text-xs font-bold text-muted-foreground uppercase">Regulatory Authority</label>
-        <Input defaultValue="Department of Forestry, Fisheries and the Environment (DFFE)" readOnly className="bg-muted/50" />
-      </div>
-      <div className="space-y-2">
-        <label className="text-xs font-bold text-muted-foreground uppercase">Reporting Period</label>
-        <Input defaultValue="Bi-Annual (January - June 2024)" readOnly className="bg-muted/50" />
-      </div>
-    </CardContent>
-  </Card>
-));
-const SecurityTab = memo(() => {
-  const [verifyResult, setVerifyResult] = useState<any>(null);
-  const clearMutation = useMutation({
-    mutationFn: () => api('/api/admin/sessions/clear', { method: 'POST' }),
-    onSuccess: (data: any) => toast.success(`Cleared ${data.cleared} active sessions. All users logged out.`),
-    onError: (e) => toast.error('Security action failed: ' + e.message),
-  });
-  const verifyMutation = useMutation({
-    mutationFn: () => api('/api/audit/verify', { method: 'POST' }),
-    onSuccess: (data: any) => {
-      setVerifyResult(data);
-      if (data.verified) {
-        toast.success(`Integrity verified: ${data.totalChecked} blocks intact.`);
-      } else {
-        toast.error(`Tamper detected at block ${data.failureIndex}`);
-      }
-    },
-  });
-  return (
-    <div className="space-y-6">
-      <Card className="border-emerald-500/20 bg-emerald-500/5">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-bold flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-emerald-500" /> Integrity Verification
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-muted-foreground">
-              {verifyResult ? (verifyResult.verified ? `Audit chain verified: ${verifyResult.totalChecked} blocks intact.` : `TAMPER DETECTED: ${verifyResult.reason}`) : 'System integrity check pending.'}
-            </span>
-            <Button variant="outline" size="sm" className="h-8" onClick={() => verifyMutation.mutate()} disabled={verifyMutation.isPending}>
-              {verifyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Run Chain Verification'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-      <Card className="bg-destructive/5 border-destructive/20 border-2">
-        <CardHeader>
-          <CardTitle className="text-destructive flex items-center gap-2"><ShieldAlert className="h-6 w-6" /> Critical Security Controls</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-4 rounded-lg bg-card/50 border border-destructive/10">
-            <div className="space-y-1">
-              <h3 className="text-lg font-bold">Terminate All Global Sessions</h3>
-              <p className="text-sm text-muted-foreground max-w-md">Forces immediate session invalidation for every active account.</p>
-            </div>
-            <Button variant="destructive" size="lg" className="h-14 px-8 font-semibold shadow-lg shadow-destructive/20" onClick={() => { if(confirm("Terminate all active sessions?")) clearMutation.mutate(); }}>
-              {clearMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-5 w-5" />} Terminate All Sessions
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-});
 const EprReportingTab = memo(() => {
   const { data: report } = useQuery({ queryKey: ['epr-report'], queryFn: () => api<EPRReport>('/api/epr-report') });
   const streamData = useMemo(() => {
     if (!report || !report.streams) return [];
-    return EPR_STREAMS.map(s => ({ 
-      name: s, 
-      weight: (report.streams as any)[s]?.weight || 0, 
-      fees: (report.streams as any)[s]?.fees || 0 
+    return EPR_STREAMS.map(s => ({
+      name: s,
+      weight: (report.streams as any)[s]?.weight || 0,
+      fees: (report.streams as any)[s]?.fees || 0
     })).filter(s => s.weight > 0);
   }, [report]);
   const handleDownloadAudit = () => {
     if (!report) return;
-    const timestamp = new Date().toISOString();
-    const streamsXml = streamData.map(s => `
-    <Stream name="${s.name}">
-      <WeightKg>${s.weight.toFixed(2)}</WeightKg>
-      <FeesZar>${s.fees.toFixed(2)}</FeesZar>
-    </Stream>`).join('');
-    const xmlString = `<?xml version="1.0" encoding="UTF-8"?>
-<EPRComplianceReport generated="${timestamp}">
-  <Framework>GovGaz43956 (South Africa)</Framework>
-  <CompliancePercentage>${report.compliance_pct.toFixed(2)}</CompliancePercentage>
-  <TotalFeesZAR>${report.total_fees.toFixed(2)}</TotalFeesZAR>
-  <Streams>${streamsXml}
-  </Streams>
-  <DigitalSignature>${crypto.randomUUID().replace(/-/g, '')}</DigitalSignature>
-</EPRComplianceReport>`;
-    const blob = new Blob([xmlString], { type: 'application/xml' });
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `epr_audit_${new Date().getTime()}.xml`;
-    document.body.appendChild(link);
+    link.download = `epr_audit_${Date.now()}.json`;
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success("EPR XML Audit Exported");
+    toast.success("Audit Exported");
   };
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -218,10 +120,10 @@ const EprReportingTab = memo(() => {
           </div>
           <div className="text-center p-6 bg-accent/5 rounded-2xl border border-accent/10">
             <div className="text-4xl font-bold">R {report?.total_fees?.toFixed(2) ?? '0.00'}</div>
-            <p className="text-sm font-medium text-muted-foreground mt-2">Total Accrued EPR Fees</p>
+            <p className="text-sm font-medium text-muted-foreground mt-2">Accrued EPR Fees</p>
           </div>
           <Button className="w-full h-14 text-lg font-semibold shadow-glow shadow-primary/20" onClick={handleDownloadAudit}>
-            <Download className="mr-2 h-5 w-5" /> Export PRO XML Audit
+            <Download className="mr-2 h-5 w-5" /> Export Audit Trail
           </Button>
         </CardContent>
       </Card>
@@ -239,44 +141,71 @@ const EprReportingTab = memo(() => {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-8">
-            <RegulationMetadataCard />
-          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+});
+const SecurityTab = memo(() => {
+  const [verifyResult, setVerifyResult] = useState<any>(null);
+  const verifyMutation = useMutation({
+    mutationFn: () => api('/api/audit/verify', { method: 'POST' }),
+    onSuccess: (data: any) => {
+      setVerifyResult(data);
+      if (data.verified) toast.success("Integrity Verified");
+      else toast.error("Tamper Detected");
+    },
+  });
+  const clearMutation = useMutation({
+    mutationFn: () => api('/api/admin/sessions/clear', { method: 'POST' }),
+    onSuccess: (data: any) => toast.success(`Cleared ${data.cleared} sessions`),
+  });
+  return (
+    <div className="space-y-6">
+      <Card className="border-emerald-500/20 bg-emerald-500/5">
+        <CardHeader><CardTitle className="text-sm font-bold flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Audit Integrity</CardTitle></CardHeader>
+        <CardContent className="flex justify-between items-center">
+          <span className="text-xs text-muted-foreground">
+            {verifyResult ? (verifyResult.verified ? "Chain Intact" : "Chain Broken") : "Verification Required"}
+          </span>
+          <Button size="sm" onClick={() => verifyMutation.mutate()} disabled={verifyMutation.isPending}>
+            {verifyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify Now"}
+          </Button>
+        </CardContent>
+      </Card>
+      <Card className="border-destructive/20 bg-destructive/5">
+        <CardHeader><CardTitle className="text-destructive flex items-center gap-2"><ShieldAlert className="h-4 w-4" /> Danger Zone</CardTitle></CardHeader>
+        <CardContent>
+          <Button variant="destructive" className="w-full h-12" onClick={() => clearMutation.mutate()} disabled={clearMutation.isPending}>
+            Terminate All User Sessions
+          </Button>
         </CardContent>
       </Card>
     </div>
   );
 });
 export function Settings() {
-  const user = useAuthStore(s => s.user);
-  if (user?.role !== 'admin') {
+  const userRole = useAuthStore(s => s.user?.role);
+  if (userRole !== 'admin') {
     return (
       <PageLayout>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <Alert variant="destructive" className="max-w-2xl mx-auto">
-            <ShieldAlert className="h-4 w-4" />
-            <AlertTitle>Administrative Access Required</AlertTitle>
-          </Alert>
-        </div>
+        <Alert variant="destructive"><ShieldAlert className="h-4 w-4" /><AlertTitle>Admin Access Required</AlertTitle></Alert>
       </PageLayout>
     );
   }
   return (
     <PageLayout>
-      <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div>
-          <h1 className="text-4xl font-display font-bold tracking-tight">System Settings</h1>
-          <p className="text-muted-foreground mt-1 text-lg italic">Enterprise Operating System Configuration</p>
-        </div>
-        <Tabs defaultValue="roles" className="space-y-6">
+      <div className="space-y-8 max-w-7xl mx-auto">
+        <h1 className="text-4xl font-display font-bold">Settings</h1>
+        <Tabs defaultValue="roles">
           <TabsList className="bg-muted p-1 rounded-xl h-12">
-            <TabsTrigger value="roles" className="px-6 rounded-lg">Permissions</TabsTrigger>
-            <TabsTrigger value="epr" className="px-6 rounded-lg">EPR Compliance</TabsTrigger>
-            <TabsTrigger value="security" className="px-6 rounded-lg">Security</TabsTrigger>
+            <TabsTrigger value="roles">Permissions</TabsTrigger>
+            <TabsTrigger value="epr">EPR Compliance</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
-          <TabsContent value="roles" className="animate-in fade-in-50"><UserRolesTable /></TabsContent>
-          <TabsContent value="epr" className="animate-in fade-in-50"><EprReportingTab /></TabsContent>
-          <TabsContent value="security" className="animate-in fade-in-50"><SecurityTab /></TabsContent>
+          <TabsContent value="roles"><UserRolesTable /></TabsContent>
+          <TabsContent value="epr"><EprReportingTab /></TabsContent>
+          <TabsContent value="security"><SecurityTab /></TabsContent>
         </Tabs>
       </div>
     </PageLayout>
