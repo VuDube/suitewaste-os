@@ -87,7 +87,7 @@ function runSetupCommands() {
     "bun add tslib@^2.6.3",
     "bun add @types/jsonwebtoken -d",
     "bun add buffer@^6.1.1 jsonwebtoken@^9.2.1",
-    "bun add buffer jsonwebtoken"
+    "bun add buffer"
 ];
     
     if (commands.length === 0) {
