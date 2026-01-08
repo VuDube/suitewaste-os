@@ -91,12 +91,14 @@ export const useOfflineStore = create<OfflineState>()(
         }
         if (ledgerSynced || transactionSynced) {
           toast.success('Pending items synced successfully!');
-          const queryClient = (window as any).queryClient;
-          if (queryClient) {
-            queryClient.invalidateQueries({ queryKey: ['ledger'] });
-            queryClient.invalidateQueries({ queryKey: ['transactions'] });
-            queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+          if (typeof window !== 'undefined') {
+            const queryClient = (window as any).queryClient;
+            if (queryClient) {
+              queryClient.invalidateQueries({ queryKey: ['ledger'] });
+              queryClient.invalidateQueries({ queryKey: ['transactions'] });
+              queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+              queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+            }
           }
         }
       },

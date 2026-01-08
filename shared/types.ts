@@ -4,12 +4,12 @@ export interface ApiResponse<T = unknown> {
   error?: string;
 }
 // --- Waste Streams per GovGaz43956 ---
-export type WasteStreamType = 
-  | 'Plastic' 
-  | 'Paper & Packaging' 
-  | 'Glass' 
-  | 'Metals' 
-  | 'Electrical & Electronic' 
+export type WasteStreamType =
+  | 'Plastic'
+  | 'Paper & Packaging'
+  | 'Glass'
+  | 'Metals'
+  | 'Electrical & Electronic'
   | 'Other';
 // --- SuiteWaste OS Core Types ---
 export interface User {
@@ -95,8 +95,6 @@ export interface EPRReport {
   audit_chain_status: 'verified' | 'tampered' | 'pending';
   regulation_metadata: string; // e.g., "GovGaz43956"
   pro_xml_mock_hash?: string;
-  streams: {
-    [key in WasteStreamType]?: EPRStreamData;
-  };
+  streams: Record<WasteStreamType, EPRStreamData>;
 }
 export type ConfigUserUpdate = Pick<User, 'id' | 'role' | 'active' | 'features'>;

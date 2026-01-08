@@ -5,7 +5,7 @@ if (workbox) {
   const { registerRoute } = workbox.routing;
   const { StaleWhileRevalidate, CacheFirst, NetworkOnly } = workbox.strategies;
   const { ExpirationPlugin } = workbox.expiration;
-  const { BackgroundSyncPlugin } = workbox.background-sync;
+  const { BackgroundSyncPlugin } = workbox.backgroundSync; // Fixed: camelCase access
   // Precache manifest placeholder (injected by build tool)
   precacheAndRoute(self.__WB_MANIFEST || []);
   // Cache Google Fonts
