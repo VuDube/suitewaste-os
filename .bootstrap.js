@@ -92,7 +92,9 @@ function runSetupCommands() {
     "bun add uuid",
     "bun install @types/w3c-web-usb @types/w3c-web-serial",
     "bun remove uuid",
-    "bun add lucide-react@latest"
+    "bun add lucide-react@latest",
+    "bun add qrcode.react leaflet react-leaflet",
+    "bun add @types/leaflet -d"
 ];
     
     if (commands.length === 0) {
