@@ -1,4 +1,4 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api-client';
@@ -61,8 +61,8 @@ export function Dashboard() {
             <Sliders className="h-4 w-4 text-muted-foreground" />
             <div className="space-y-1">
               <div className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">ML Sensitivity</div>
-              <input 
-                type="range" min="0" max="100" value={riskThreshold} 
+              <input
+                type="range" min="0" max="100" value={riskThreshold}
                 onChange={(e) => setRiskThreshold(parseInt(e.target.value))}
                 className="w-32 accent-primary h-1"
               />
@@ -109,7 +109,7 @@ export function Dashboard() {
                   <CartesianGrid vertical={false} strokeOpacity={0.05} />
                   <XAxis dataKey="date" axisLine={false} tickLine={false} tickMargin={8} fontSize={10}/>
                   <YAxis axisLine={false} tickLine={false} tickMargin={8} fontSize={10}/>
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#0B0B0B', border: '1px solid #333', borderRadius: '12px' }}
                     labelStyle={{ fontWeight: 'black', textTransform: 'uppercase', fontSize: '10px' }}
                   />

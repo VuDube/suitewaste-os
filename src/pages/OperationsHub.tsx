@@ -11,6 +11,7 @@ import { Box, QrCode, ClipboardCheck, AlertCircle, Printer, Download, Search } f
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { motion } from 'framer-motion';
 export function OperationsHub() {
   const [searchTerm, setSearchTerm] = useState('');
   const { data: ledger, isLoading } = useQuery({ queryKey: ['ledger'], queryFn: () => api<any[]>('/api/ledger') });
@@ -19,7 +20,7 @@ export function OperationsHub() {
       description: "Inventory manifest updated across all nodes."
     });
   };
-  const filteredItems = ledger?.filter(item => 
+  const filteredItems = ledger?.filter(item =>
     item.material_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.id.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
@@ -45,8 +46,8 @@ export function OperationsHub() {
             <CardHeader className="flex flex-row items-center justify-between pb-6">
               <div className="relative w-full max-w-sm">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search batches..." 
+                <Input
+                  placeholder="Search batches..."
                   className="pl-10 h-12 bg-surface-variant/50 border-none rounded-xl font-bold"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}

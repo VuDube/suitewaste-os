@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, ShieldCheck, Factory, Box, Search, Filter, ArrowUpRight, Lock, Key } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 export function BuyerPortal() {
   const { data: lots, isLoading } = useQuery({ queryKey: ['market-lots'], queryFn: () => api<any[]>('/api/marketplace/lots') });
   const [isRegisteringKey, setIsRegisteringKey] = useState(false);
