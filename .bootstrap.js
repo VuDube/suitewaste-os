@@ -91,7 +91,8 @@ function runSetupCommands() {
     "bun add framer-motion lucide-react clsx tailwind-merge",
     "bun add uuid",
     "bun install @types/w3c-web-usb @types/w3c-web-serial",
-    "bun remove uuid"
+    "bun remove uuid",
+    "bun add lucide-react@latest"
 ];
     
     if (commands.length === 0) {
