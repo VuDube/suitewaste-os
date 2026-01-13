@@ -72,18 +72,19 @@ export function StaffManager() {
                 <PlusCircle className="mr-2 h-5 w-5" /> Add Staff Member
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent aria-labelledby="add-staff-title" aria-describedby="add-staff-desc">
               <DialogHeader>
-                <DialogTitle>Register New Personnel</DialogTitle>
-                <DialogDescription className="text-muted-foreground">Provide employee details, secure PIN, and role for operational access and shift tracking.</DialogDescription>
+                <DialogTitle id="add-staff-title">Register New Personnel</DialogTitle>
+                <DialogDescription id="add-staff-desc" className="text-muted-foreground">Provide employee details, secure PIN, and role for operational access and shift tracking.</DialogDescription>
               </DialogHeader>
               <form className="space-y-4 pt-4" onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
+                const roleSelect = formData.get('role');
                 createMutation.mutate({
                   name: formData.get('name') as string,
                   pin: formData.get('pin') as string,
-                  role: formData.get('role') as any,
+                  role: (roleSelect && ['operator','clerk','driver','manager'].includes(roleSelect as any) ? roleSelect as any : 'operator') as 'operator'|'clerk'|'driver'|'manager',
                   clock_status: 'out'
                 });
               }}>
@@ -98,7 +99,10 @@ export function StaffManager() {
                   </div>
                   <div className="space-y-2">
                     <Label>Role</Label>
-                    <Select name="role" defaultValue="operator">
+                    <Select name="role" defaultValue="operator" onValueChange={(value) => {
+                      const select = document.querySelector('select[name="role"]') as HTMLSelectElement;
+                      if (select) select.value = value;
+                    }}>
                       <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="operator">Operator</SelectItem>
@@ -107,7 +111,6 @@ export function StaffManager() {
                         <SelectItem value="manager">Manager</SelectItem>
                       </SelectContent>
                     </Select>
-                    <input type="hidden" name="role" defaultValue="operator" />
                   </div>
                 </div>
                 <Button type="submit" className="w-full h-14 text-lg font-bold mt-2" disabled={createMutation.isPending}>

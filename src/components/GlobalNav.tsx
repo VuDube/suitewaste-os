@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { HardHat, Menu, LayoutDashboard, Weight, BookOpen, Settings2, LogOut, Landmark, Briefcase, Truck, ShoppingCart, Factory, ShieldCheck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -81,7 +81,11 @@ export function GlobalNav() {
               <span className="text-[10px] font-black uppercase tracking-widest">More</span>
             </button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="bg-background/95 backdrop-blur-2xl rounded-t-3xl p-8">
+          <SheetContent side="bottom" className="bg-background/95 backdrop-blur-2xl rounded-t-3xl p-8" aria-labelledby="more-nav-title" aria-describedby="more-nav-desc">
+            <SheetHeader className="sr-only">
+              <SheetTitle id="more-nav-title">More Navigation</SheetTitle>
+              <SheetDescription id="more-nav-desc">Access additional app sections and settings.</SheetDescription>
+            </SheetHeader>
             <div className="grid grid-cols-3 gap-4 mb-8">
               {moreItems.map(item => (
                 <NavLink key={item.href} to={item.href} onClick={() => setMobileMoreOpen(false)} className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-surface-variant/50">
