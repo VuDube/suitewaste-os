@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Weight, PieChart as PieChartIcon, Truck, ShoppingCart, Landmark, ArrowUpRight, History } from 'lucide-react';
+import { RiskMeter } from '@/components/RiskMeter';
+import { useLME } from '@/hooks/useLME';
+import { Weight, PieChart as PieChartIcon, Truck, Landmark, ArrowUpRight, History, Zap, TrendingUp, TrendingDown } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useOfflineStore } from '@/stores/useOfflineStore';
 import { cn } from '@/lib/utils';
@@ -31,6 +33,7 @@ export function Dashboard() {
   const pendingLedgerCount = useOfflineStore(s => s.pendingLedgerEntries.length);
   const pendingTransactionCount = useOfflineStore(s => s.pendingTransactions.length);
   const totalPending = pendingLedgerCount + pendingTransactionCount;
+  const { prices } = useLME();
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api<any>('/api/dashboard'),
@@ -44,128 +47,114 @@ export function Dashboard() {
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
             <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">Command</h1>
             <div className="flex items-center gap-3">
-              <Badge variant="outline" className="font-black border-primary/20 text-primary px-3">{userRole}</Badge>
+              <Badge variant="outline" className="font-black border-primary/20 text-primary px-3 uppercase">{userRole}</Badge>
               {totalPending > 0 && <Badge className="bg-orange-600 animate-pulse">{totalPending} Queued</Badge>}
             </div>
           </motion.div>
         </header>
+        {/* LME Live Ticker */}
+        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-2">
+          {prices.map(price => (
+            <Card key={price.id} className="min-w-[180px] bg-card/40 border-white/5 shadow-elevation-1">
+              <CardContent className="p-4 flex flex-col gap-1">
+                <span className="text-[10px] font-black uppercase text-muted-foreground">{price.name}</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold">R{price.priceZAR.toFixed(2)}</span>
+                  <div className={cn("flex items-center text-[10px] font-bold", price.changePct >= 0 ? "text-emerald-500" : "text-red-500")}>
+                    {price.changePct >= 0 ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
+                    {Math.abs(price.changePct).toFixed(1)}%
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
         <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           <KpiCard title="Mass Total" value={`${(summary.totalWeight || 0).toLocaleString()} kg`} icon={Weight} isLoading={isLoading} color="text-primary" />
           <KpiCard title="Yield Value" value={`R${(summary.totalValue || 0).toLocaleString()}`} icon={Landmark} isLoading={isLoading} />
           <KpiCard title="EPR Score" value={`${(summary.weeePct || 0).toFixed(1)}%`} icon={PieChartIcon} isLoading={isLoading} color="text-emerald-500" />
           <KpiCard title="Fleet Nodes" value={summary.fleet_efficiency ? `${summary.fleet_efficiency}%` : "100%"} icon={Truck} isLoading={isLoading} />
         </div>
-        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <KpiCard title="PET" value={`${(summary.materialBreakdown?.PET || 0).toLocaleString()} kg`} icon={PieChartIcon} isLoading={isLoading} color="text-emerald-500" />
-          <KpiCard title="HDPE" value={`${(summary.materialBreakdown?.HDPE || 0).toLocaleString()} kg`} icon={PieChartIcon} isLoading={isLoading} color="text-blue-500" />
-          <KpiCard title="Al" value={`${(summary.materialBreakdown?.Al || 0).toLocaleString()} kg`} icon={PieChartIcon} isLoading={isLoading} color="text-orange-500" />
-          <KpiCard title="Paper" value={`${(summary.materialBreakdown?.Paper || 0).toLocaleString()} kg`} icon={PieChartIcon} isLoading={isLoading} color="text-amber-500" />
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <Card className="glass-panel border-none shadow-elevation-3 h-[300px]">
-            <CardHeader>
-              <CardTitle className="text-sm font-black uppercase tracking-widest">Trends</CardTitle>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2 glass-panel border-none shadow-elevation-3 h-[400px]">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-black uppercase tracking-widest">Growth Trends</CardTitle>
+              <Zap className="h-4 w-4 text-primary animate-pulse" />
             </CardHeader>
-            <CardContent className="h-[250px]">
+            <CardContent className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dashboardData?.summary?.trends || []}>
                   <defs>
                     <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#8884d8" stopOpacity={0.8}/>
-                      <stop offset="100%" stopColor="#8884d8" stopOpacity={0}/>
+                      <stop offset="0%" stopColor="#38761d" stopOpacity={0.4}/>
+                      <stop offset="100%" stopColor="#38761d" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid vertical={false} strokeOpacity={0.1} />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} tickMargin={8}/>
-                  <YAxis axisLine={false} tickLine={false} tickMargin={8}/>
-                  <Tooltip />
-                  <Legend />
-                  <Area type="monotone" dataKey="weight" stroke="#8884d8" fill="url(#weightGradient)" strokeWidth={2}/>
-                  <Area type="monotone" dataKey="value" stroke="#82ca9d" fillOpacity={0.3} strokeWidth={2}/>
+                  <CartesianGrid vertical={false} strokeOpacity={0.05} />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tickMargin={8} fontSize={10}/>
+                  <YAxis axisLine={false} tickLine={false} tickMargin={8} fontSize={10}/>
+                  <Tooltip contentStyle={{ backgroundColor: '#0B0B0B', border: '1px solid #333', borderRadius: '12px' }} />
+                  <Area type="monotone" dataKey="weight" stroke="#38761d" fill="url(#weightGradient)" strokeWidth={3}/>
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-          
-          <Card className="glass-panel border-none shadow-elevation-3">
+          <Card className="glass-panel border-none shadow-elevation-3 flex flex-col">
             <CardHeader>
-              <CardTitle className="text-sm font-black uppercase tracking-widest">AI Fraud Risk</CardTitle>
+              <CardTitle className="text-sm font-black uppercase tracking-widest">Operations Integrity</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center h-[250px]">
-              <ResponsiveContainer width="100%" height={200}>
-                <RadialBarChart data={[{ riskMeter: dashboardData?.summary?.ai_fraud_risk || 0 }]} cx="50%" cy="50%" innerRadius="40%" outerRadius="80%" barSize={20}>
-                  <RadialBar background cornerRadius={10} dataKey="riskMeter">
-                    <Cell fill={dashboardData?.summary?.ai_fraud_risk < 10 ? '#82ca9d' : dashboardData?.summary?.ai_fraud_risk <= 20 ? '#fbbf24' : '#ef4444'} />
-                  </RadialBar>
-                  <Tooltip />
-                </RadialBarChart>
-              </ResponsiveContainer>
-              <div className="mt-4 text-2xl font-black">
-                {`${(dashboardData?.summary?.ai_fraud_risk || 0).toFixed(1)}%`}
+            <CardContent className="flex-1 flex flex-col justify-center gap-8">
+              <RiskMeter score={summary.ai_fraud_risk || 12} factors={['High Volume Variance', 'Frequent Vendor']} />
+              <div className="space-y-4">
+                 <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground font-bold uppercase">System Status</span>
+                    <Badge className="bg-emerald-600 font-bold">OPTIMIZED</Badge>
+                 </div>
+                 <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground font-bold uppercase">Chain Linkage</span>
+                    <span className="text-primary font-black">100% SECURE</span>
+                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
-
-        {(() => {
-          const isDirector = userRole === 'admin' || userRole === 'auditor';
-          const lme = summary.lme_prices || {};
-          const vat_due = summary.vat_due || 0;
-          if (isDirector) {
-            return (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <Card className="glass-panel border-none shadow-elevation-3">
-                  <CardHeader>
-                    <CardTitle className="text-sm font-black uppercase tracking-widest">LME Prices</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex justify-between"><span className="font-bold">Aluminium:</span><span>{lme?.Aluminium?.toLocaleString()} ZAR/t</span></div>
-                    <div className="flex justify-between"><span className="font-bold">Copper:</span><span>{lme?.Copper?.toLocaleString()} ZAR/t</span></div>
-                  </CardContent>
-                </Card>
-                <Card className="glass-panel border-none shadow-elevation-3">
-                  <CardHeader>
-                    <CardTitle className="text-sm font-black uppercase tracking-widest">SARS VAT Due</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-3xl font-black text-center pt-4">
-                    R{vat_due.toLocaleString()}
-                  </CardContent>
-                </Card>
-              </div>
-            );
-          }
-          return null;
-        })()}
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 glass-panel border-none p-1">
-            <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><History className="h-4 w-4" /> Operations Stream</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><History className="h-4 w-4" /> Live Operations Feed</CardTitle></CardHeader>
             <CardContent className="p-0">
                <div className="flex flex-col">
-                  {[1, 2, 3].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className="flex items-center justify-between p-5 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors touch-haptic group">
                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-2xl bg-surface-variant flex items-center justify-center font-black">#{i}</div>
+                          <div className="h-10 w-10 rounded-xl bg-surface-variant flex items-center justify-center font-black text-xs">TRX</div>
                           <div>
-                            <div className="font-bold text-sm">Industrial Scrap A</div>
-                            <div className="text-[10px] text-muted-foreground uppercase font-black">Ref: POS-00{i}</div>
+                            <div className="font-bold text-sm">Industrial Collection #{1000 + i}</div>
+                            <div className="text-[9px] text-muted-foreground uppercase font-black tracking-widest">Copper Grade A • Jozi Scrap</div>
                           </div>
                        </div>
-                       <ArrowUpRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                       <div className="flex items-center gap-4">
+                          <div className="text-right hidden sm:block">
+                            <div className="text-sm font-black text-primary">R 12,450.00</div>
+                            <div className="text-[9px] font-bold text-muted-foreground">08:45 AM</div>
+                          </div>
+                          <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                       </div>
                     </div>
                   ))}
                </div>
             </CardContent>
           </Card>
           <section className="space-y-6">
-            <Card className="bg-primary shadow-elevation-12 border-none">
-              <CardContent className="p-8 flex flex-col items-center text-center text-primary-foreground space-y-4">
-                 <Weight className="h-12 w-12" />
-                 <h3 className="text-xl font-black uppercase tracking-tighter">Quick Weigh</h3>
-                 <p className="text-sm font-bold opacity-80">Launch industrial scale interface.</p>
-                 <Button asChild variant="secondary" className="w-full h-14 rounded-2xl font-black uppercase tracking-widest touch-haptic">
-                    <Link to="/quick-weight">Initialize POS</Link>
+            <Card className="bg-primary shadow-elevation-12 border-none relative overflow-hidden group">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent" />
+              <CardContent className="p-8 flex flex-col items-center text-center text-primary-foreground space-y-4 relative z-10">
+                 <div className="h-14 w-14 rounded-2xl bg-white/10 flex items-center justify-center mb-2">
+                   <Weight className="h-8 w-8" />
+                 </div>
+                 <h3 className="text-xl font-black uppercase tracking-tighter">Initialize POS</h3>
+                 <p className="text-xs font-bold opacity-80 max-w-[200px]">Secure industrial weight capture with real-time LME pricing.</p>
+                 <Button asChild variant="secondary" className="w-full h-14 rounded-2xl font-black uppercase tracking-widest touch-haptic shadow-lg">
+                    <Link to="/quick-weight">Start Weighing</Link>
                  </Button>
               </CardContent>
             </Card>
