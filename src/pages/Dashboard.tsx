@@ -95,7 +95,7 @@ export function Dashboard() {
             <CardContent className="flex flex-col items-center justify-center h-[250px]">
               <ResponsiveContainer width="100%" height={200}>
                 <RadialBarChart data={[{ riskMeter: dashboardData?.summary?.ai_fraud_risk || 0 }]} cx="50%" cy="50%" innerRadius="40%" outerRadius="80%" barSize={20}>
-                  <RadialBar background={{ cornerRadius: 10 }} dataKey="riskMeter" minAngle={15} clockWise minPointSize={10}>
+                  <RadialBar background cornerRadius={10} dataKey="riskMeter" minAngle={15} clockWise minPointSize={10}>
                     <Cell fill={dashboardData?.summary?.ai_fraud_risk < 10 ? '#82ca9d' : dashboardData?.summary?.ai_fraud_risk <= 20 ? '#fbbf24' : '#ef4444'} />
                   </RadialBar>
                   <Tooltip />
