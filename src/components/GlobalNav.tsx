@@ -12,13 +12,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 const navItems = [
   { href: '/', label: 'Home', icon: LayoutDashboard, roles: ['operator', 'manager', 'admin', 'auditor', 'buyer', 'producer'] },
-  { href: '/quick-weight', label: 'Weigh', icon: Weight, roles: ['operator', 'manager', 'admin'] },
-  { href: '/ledger', label: 'Ledger', icon: BookOpen, roles: ['manager', 'admin', 'auditor'] },
-  { href: '/transactions', label: 'Cash', icon: FileText, roles: ['manager', 'admin', 'auditor'] },
+  { href: '/quick-weight', label: 'POS', icon: Weight, roles: ['operator', 'manager', 'admin'] },
+  { href: '/compliance', label: 'Legal', icon: ShieldCheck, roles: ['manager', 'admin', 'auditor'] },
+  { href: '/ledger', label: 'Audit', icon: BookOpen, roles: ['manager', 'admin', 'auditor'] },
+  { href: '/finance', label: 'Finance', icon: Landmark, roles: ['manager', 'admin', 'auditor'] },
   { href: '/fleet', label: 'Fleet', icon: Truck, roles: ['manager', 'admin'], features: ['fleet-management'] },
-  { href: '/marketplace', label: 'Market', icon: ShoppingCart, roles: ['buyer', 'admin'] },
-  { href: '/producer-portal', label: 'ESG', icon: Factory, roles: ['producer', 'admin'] },
+  { href: '/marketplace', label: 'Bids', icon: ShoppingCart, roles: ['buyer', 'admin'] },
+  { href: '/producer-portal', label: 'ESG Hub', icon: Factory, roles: ['producer', 'admin'] },
   { href: '/staff', label: 'Staff', icon: Briefcase, roles: ['manager', 'admin'] },
+  { href: '/wingman', label: 'Wingman', icon: MessageCircle, roles: ['operator', 'manager', 'admin', 'driver'] },
 ];
 export function GlobalNav() {
   const [isMobileMoreOpen, setMobileMoreOpen] = useState(false);
@@ -35,8 +37,8 @@ export function GlobalNav() {
   const accessibleNavItems = navItems.filter(item =>
     user && item.roles.includes(item.roles.includes(user.role) ? user.role : 'never') &&
     (!item.features || item.features.every(f => user.features?.includes(f)))
-  ).slice(0, 4);
-  const moreItems = navItems.filter(item => 
+  ).slice(0, 5);
+  const moreItems = navItems.filter(item =>
     user && item.roles.includes(user.role) && !accessibleNavItems.includes(item)
   );
   return (
@@ -67,7 +69,7 @@ export function GlobalNav() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-background/90 backdrop-blur-2xl border-t border-white/5 z-50 flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)] shadow-elevation-12">
         {accessibleNavItems.map(item => (
           <NavLink key={item.href} to={item.href} className={({ isActive }) => cn(
-            "relative flex flex-col items-center justify-center w-16 h-14 rounded-2xl transition-all touch-haptic group",
+            "relative flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all touch-haptic group",
             isActive ? "text-primary" : "text-muted-foreground"
           )}>
             {({ isActive }) => (

@@ -14,6 +14,7 @@ import { SupplierDirectory } from '@/pages/SupplierDirectory';
 import { InventoryLedger } from '@/pages/InventoryLedger';
 import { Transactions } from '@/pages/Transactions';
 import { HardwareIntegrations } from '@/pages/HardwareIntegrations';
+import { ComplianceHub } from '@/pages/ComplianceHub';
 import { Login } from '@/pages/Login';
 import { AuditLog } from '@/pages/AuditLog';
 import { Settings } from '@/pages/Settings';
@@ -23,6 +24,7 @@ import { FinanceLedger } from '@/pages/FinanceLedger';
 import { FleetPortal } from '@/pages/FleetPortal';
 import { BuyerPortal } from '@/pages/BuyerPortal';
 import { ProducerPortal } from '@/pages/ProducerPortal';
+import { Wingman } from '@/pages/Wingman';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -48,6 +50,8 @@ const router = createBrowserRouter([
   { path: "/ledger", element: <InventoryLedger />, errorElement: <RouteErrorBoundary /> },
   { path: "/transactions", element: <Transactions />, errorElement: <RouteErrorBoundary /> },
   { path: "/finance", element: <FinanceLedger />, errorElement: <RouteErrorBoundary /> },
+  { path: "/compliance", element: <ComplianceHub />, errorElement: <RouteErrorBoundary /> },
+  { path: "/wingman", element: <Wingman />, errorElement: <RouteErrorBoundary /> },
   { path: "/staff", element: <StaffManager />, errorElement: <RouteErrorBoundary /> },
   { path: "/fleet", element: <FleetPortal />, errorElement: <RouteErrorBoundary /> },
   { path: "/marketplace", element: <BuyerPortal />, errorElement: <RouteErrorBoundary /> },

@@ -12,6 +12,11 @@ import {
   RouteEntity,
   OrderEntity,
   ProducerRequestEntity,
+  SapsRecordEntity,
+  BidEntity,
+  ObdLogEntity,
+  PayrollEntity,
+  ChatMsgEntity,
   TimesheetEntity,
   GLAccountEntity
 } from "./entities";
@@ -242,6 +247,52 @@ export function userRoutes(app: HonoApp) {
       audit_chain_status: 'verified',
       total_weight_kg: totalWeight
     });
+  });
+  app.get('/api/compliance/saps607', requireRole(['admin', 'auditor']), async (c) => {
+    const result = await SapsRecordEntity.list(c.env, null, 100);
+    return ok(c, result?.items || []);
+  });
+  app.get('/api/finance/payroll', requireRole(['admin', 'manager']), async (c) => {
+    const result = await PayrollEntity.list(c.env, null, 100);
+    return ok(c, result?.items || []);
+  });
+  app.post('/api/marketplace/bids', requireRole(['buyer', 'admin']), async (c) => {
+    const body = await c.req.json();
+    const bid = await BidEntity.create(c.env, { ...body, id: crypto.randomUUID(), timestamp: Date.now() });
+    return ok(c, bid);
+  });
+  app.post('/api/fleet/obd-webhook', async (c) => {
+    const body = await c.req.json();
+    const log = await ObdLogEntity.create(c.env, { ...body, id: crypto.randomUUID(), timestamp: Date.now() });
+    return ok(c, log);
+  });
+  app.post('/api/ai/wingman-voice', async (c) => {
+    const { text } = await c.req.json();
+    if (!c.env.AI) return ok(c, { response: "AI engine offline. Manual override active." });
+    try {
+      const result = await c.env.AI.run('@cf/meta/llama-2-7b-chat-fp16', {
+        messages: [
+          { role: 'system', content: 'You are Wingman, the SuiteWaste OS industrial voice assistant. Be brief, professional, and focus on scrap metal and logistics context.' },
+          { role: 'user', content: text }
+        ]
+      });
+      return ok(c, { response: result.response });
+    } catch (e) {
+      return bad(c, "Voice NLP processing failed");
+    }
+  });
+  app.post('/api/payments/stitch-init', requireRole(['admin', 'manager']), async (c) => {
+    // Mocking Stitch Payout Initialization
+    const { amount, staffId } = await c.req.json();
+    const payoutId = `stch_${crypto.randomUUID().split('-')[0]}`;
+    await AuditLogEntity.record(c.env, {
+        entity_id: payoutId,
+        entity_type: 'finance',
+        action: 'create',
+        actor_id: c.get('user')?.id || 'system',
+        details: `Initialized Stitch payout of ZAR ${amount} to ${staffId}`
+    });
+    return ok(c, { payoutId, status: 'initiated' });
   });
   app.get('/api/finance/gl-summary', async (c) => {
     const accounts = await GLAccountEntity.list(c.env, null, 100);
