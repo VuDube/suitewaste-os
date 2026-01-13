@@ -1,5 +1,4 @@
 import type { Supplier, InventoryLedgerEntry, Transaction, User } from './types';
-import { v4 as uuid } from 'uuid';
 export const MOCK_USERS: User[] = [
   {
     id: 'user-op-001',
@@ -40,7 +39,7 @@ export const MOCK_USERS: User[] = [
 ];
 export const MOCK_SUPPLIERS: Supplier[] = [
   {
-    id: uuid(),
+    id: 'supp-001',
     name: 'Jozi Scrap Metals',
     contact_person: 'John Doe',
     phone_number: '011 123 4567',
@@ -52,7 +51,7 @@ export const MOCK_SUPPLIERS: Supplier[] = [
     updated_at: Date.now(),
   },
   {
-    id: uuid(),
+    id: 'supp-002',
     name: 'Cape Town Recycling Co.',
     contact_person: 'Jane Smith',
     phone_number: '021 987 6543',
@@ -63,28 +62,15 @@ export const MOCK_SUPPLIERS: Supplier[] = [
     created_at: Date.now() - 86400000,
     updated_at: Date.now() - 86400000,
   },
-  {
-    id: uuid(),
-    name: 'Durban Waste Warriors',
-    contact_person: 'Sam Wilson',
-    phone_number: '031 555 8888',
-    email: 'sam@durbanwaste.co.za',
-    address: '78 Industrial Park, Durban, 4001',
-    epr_number: 'EPR789/ZA',
-    is_weee_compliant: false,
-    created_at: Date.now() - 172800000,
-    updated_at: Date.now() - 172800000,
-  },
 ];
-const ledgerEntry1Id = uuid();
 export const MOCK_INVENTORY_LEDGER: InventoryLedgerEntry[] = [
   {
-    id: ledgerEntry1Id,
-    supplier_id: MOCK_SUPPLIERS[0].id,
+    id: 'ledger-001',
+    supplier_id: 'supp-001',
     material_type: 'Copper Wire',
     weight_kg: 125.5,
     capture_timestamp: Date.now(),
-    operator_id: 'op-001',
+    operator_id: 'user-op-001',
     device_id: 'scale-01',
     is_synced: true,
     created_at: Date.now(),
@@ -92,8 +78,8 @@ export const MOCK_INVENTORY_LEDGER: InventoryLedgerEntry[] = [
 ];
 export const MOCK_TRANSACTIONS: Transaction[] = [
   {
-    id: uuid(),
-    ledger_entry_id: ledgerEntry1Id,
+    id: 'trans-001',
+    ledger_entry_id: 'ledger-001',
     amount: 7530.00,
     currency: 'ZAR',
     payment_method: 'EFT',

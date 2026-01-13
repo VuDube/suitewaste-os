@@ -13,23 +13,29 @@ import { motion } from 'framer-motion';
 const channels = [
   { id: 'general', name: 'General', icon: Hash },
   { id: 'logistics', name: 'Logistics', icon: Terminal },
-  { id: 'finance', name: 'Finance', icon: Hash },
-  { id: 'system', name: 'System Notifications', icon: Bell, isSystem: true },
+  { id: 'system', name: 'Notifications', icon: Bell, isSystem: true },
 ];
 export function Chat() {
-  const user = useAuthStore(s => s.user);
-  const totalPending = useOfflineStore(s => s.totalPending());
+  const username = useAuthStore(s => s.user?.username);
+  const hasChatAccess = useAuthStore(s => s.user?.features?.includes('chat-access'));
+  const pendingLedgerCount = useOfflineStore(s => s.pendingLedgerEntries.length);
+  const pendingTransactionCount = useOfflineStore(s => s.pendingTransactions.length);
+  const totalPending = pendingLedgerCount + pendingTransactionCount;
   const [activeChannel, setActiveChannel] = useState('general');
   const [message, setMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<any[]>([
-    { id: 1, channel: 'general', user: 'Admin', text: 'Welcome to SuiteWaste OS Chat.', timestamp: '08:00 AM', avatar: 'https://github.com/shadcn.png' },
-    { id: 2, channel: 'system', user: 'SYSTEM', text: 'Daily database backup finalized.', timestamp: '04:00 AM', isSystem: true },
+    { id: 1, channel: 'general', user: 'Admin', text: 'SuiteWaste Chat Online.', timestamp: '08:00 AM', avatar: 'https://github.com/shadcn.png' },
   ]);
-  const hasChatAccess = user?.features?.includes('chat-access');
   useEffect(() => {
     if (totalPending > 0) {
-      const sysMsg = { id: Date.now(), channel: 'system', user: 'SYNC', text: `Local queue: ${totalPending} items pending synchronization.`, timestamp: new Date().toLocaleTimeString(), isSystem: true };
-      setChatHistory(prev => [...prev, sysMsg]);
+      setChatHistory(prev => [...prev, {
+        id: Date.now(),
+        channel: 'system',
+        user: 'SYNC',
+        text: `${totalPending} items pending sync.`,
+        timestamp: new Date().toLocaleTimeString(),
+        isSystem: true
+      }]);
     }
   }, [totalPending]);
   if (!hasChatAccess) {
@@ -37,24 +43,29 @@ export function Chat() {
       <PageLayout>
         <div className="max-w-2xl mx-auto text-center py-20 space-y-6">
           <ShieldAlert className="h-20 w-20 text-destructive mx-auto" />
-          <h2 className="text-3xl font-bold">Communication Restricted</h2>
-          <p className="text-muted-foreground">Industrial communication channels require "chat-access" feature flags.</p>
+          <h2 className="text-3xl font-bold">Access Denied</h2>
+          <p className="text-muted-foreground">Chat access flag required.</p>
         </div>
       </PageLayout>
     );
   }
   const handleSend = () => {
     if (!message.trim()) return;
-    const newMsg = { id: Date.now(), channel: activeChannel, user: user?.username || 'You', text: message, timestamp: new Date().toLocaleTimeString(), isSender: true };
-    setChatHistory(prev => [...prev, newMsg]);
+    setChatHistory(prev => [...prev, {
+      id: Date.now(),
+      channel: activeChannel,
+      user: username || 'You',
+      text: message,
+      timestamp: new Date().toLocaleTimeString(),
+      isSender: true
+    }]);
     setMessage('');
   };
-  const filteredMessages = chatHistory.filter(m => m.channel === activeChannel);
   return (
     <PageLayout>
-      <div className="max-w-7xl mx-auto h-[calc(100dvh-12rem)] border border-border rounded-3xl overflow-hidden flex bg-card/60 backdrop-blur-xl shadow-2xl">
-        <div className="w-64 border-r border-border/50 bg-secondary/20 hidden md:flex flex-col">
-          <header className="p-6 border-b border-border/50">
+      <div className="max-w-7xl mx-auto h-[calc(100dvh-12rem)] border rounded-3xl overflow-hidden flex bg-card/60 backdrop-blur-xl">
+        <div className="w-64 border-r hidden md:flex flex-col bg-secondary/20">
+          <header className="p-6 border-b">
             <h2 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Channels</h2>
           </header>
           <ScrollArea className="flex-1 px-3 py-4">
@@ -64,11 +75,11 @@ export function Chat() {
                   key={chan.id}
                   onClick={() => setActiveChannel(chan.id)}
                   className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all truncate",
-                    activeChannel === chan.id ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold truncate",
+                    activeChannel === chan.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
                   )}
                 >
-                  <chan.icon className="h-4 w-4 shrink-0" />
+                  <chan.icon className="h-4 w-4" />
                   <span className="truncate">{chan.name}</span>
                 </button>
               ))}
@@ -76,35 +87,23 @@ export function Chat() {
           </ScrollArea>
         </div>
         <div className="flex-1 flex flex-col">
-          <header className="h-16 px-6 border-b border-border/50 flex items-center justify-between bg-card/40">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <span className="font-black uppercase tracking-tighter text-lg truncate">{activeChannel}</span>
-              <Badge variant="outline" className="text-[10px] font-bold shrink-0">ENCRYPTED</Badge>
-            </div>
-            <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground">
-              <Users className="h-4 w-4" /> 12 Online
-            </div>
+          <header className="h-16 px-6 border-b flex items-center justify-between">
+            <span className="font-black uppercase tracking-tighter text-lg">#{activeChannel}</span>
+            <Badge variant="outline">ENCRYPTED</Badge>
           </header>
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-6 max-w-4xl mx-auto">
-              {filteredMessages.map((msg) => (
+              {chatHistory.filter(m => m.channel === activeChannel || m.channel === 'system').map((msg) => (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={msg.id} className={cn("flex items-start gap-4", msg.isSender ? "flex-row-reverse" : "flex-row")}>
-                  {!msg.isSender && !msg.isSystem && (
-                    <Avatar className="h-10 w-10 border-2 border-primary/20">
-                      <AvatarImage src={msg.avatar} />
-                      <AvatarFallback className="bg-primary text-white font-black">{msg.user.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                  )}
-                  {msg.isSystem && <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20"><Bell className="h-4 w-4 text-emerald-500" /></div>}
                   <div className={cn("space-y-1", msg.isSender ? "items-end text-right" : "items-start")}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{msg.user}</span>
-                      <span className="text-[10px] text-muted-foreground/50">{msg.timestamp}</span>
+                    <div className="flex items-center gap-2 mb-1 text-[10px] font-black uppercase text-muted-foreground">
+                      <span>{msg.user}</span>
+                      <span>{msg.timestamp}</span>
                     </div>
                     <div className={cn(
-                      "px-4 py-3 rounded-2xl text-sm font-medium max-w-sm md:max-w-md",
-                      msg.isSender ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10 rounded-tr-none" :
-                      msg.isSystem ? "bg-emerald-500/5 border border-emerald-500/20 text-emerald-500 font-bold" : "bg-secondary/50 rounded-tl-none"
+                      "px-4 py-3 rounded-2xl text-sm font-medium max-w-sm",
+                      msg.isSender ? "bg-primary text-primary-foreground" : 
+                      msg.isSystem ? "bg-emerald-500/5 text-emerald-500" : "bg-secondary/50"
                     )}>
                       {msg.text}
                     </div>
@@ -113,21 +112,16 @@ export function Chat() {
               ))}
             </div>
           </ScrollArea>
-          <footer className="p-6 border-t border-border/50 bg-card/40">
-            <div className="max-w-4xl mx-auto flex items-center gap-4">
-              <div className="flex-1 relative">
-                <Input
-                  placeholder={`Message #${activeChannel}...`}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  className="h-14 bg-secondary/30 border-none rounded-2xl px-6 focus-visible:ring-primary/40 font-medium"
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-muted-foreground/40">
-                  <span className="text-[10px] font-black uppercase tracking-tighter">Enter to send</span>
-                </div>
-              </div>
-              <Button onClick={handleSend} className="h-14 w-14 rounded-2xl shadow-lg shadow-primary/20" size="icon">
+          <footer className="p-6 border-t bg-card/40">
+            <div className="max-w-4xl mx-auto flex gap-4">
+              <Input
+                placeholder="Message..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                className="h-14 rounded-2xl"
+              />
+              <Button onClick={handleSend} className="h-14 w-14 rounded-2xl" size="icon">
                 <Send className="h-6 w-6" />
               </Button>
             </div>

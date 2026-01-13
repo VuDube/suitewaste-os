@@ -1,25 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-// Define Web Serial types for the hook
-type SerialPortRequestOptions = {
-  filters?: { usbVendorId?: number; usbProductId?: number }[];
-};
-type SerialPort = EventTarget & {
-  open(options: { baudRate: number }): Promise<void>;
-  close(): Promise<void>;
-  readable: ReadableStream<Uint8Array> | null;
-  writable: WritableStream<Uint8Array> | null;
-  addEventListener(type: 'disconnect', listener: (ev: Event) => any, options?: boolean | AddEventListenerOptions): void;
-  removeEventListener(type: 'disconnect', listener: (ev: Event) => any, options?: boolean | EventListenerOptions): void;
-};
-declare global {
-  interface Navigator {
-    serial: {
-      requestPort(options?: SerialPortRequestOptions): Promise<SerialPort>;
-      getPorts(): Promise<SerialPort[]>;
-    };
-  }
-}
 type ScaleStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'parsing' | 'failover';
 interface DeviceHealth {
   id: string;
@@ -41,7 +21,7 @@ export function useMultiScale() {
       try {
         await readerRef.current.cancel();
       } catch (e) {
-        console.warn('Reader cancel failed or already closed', e);
+        console.warn('Reader cancel failed', e);
       }
       try {
         readerRef.current.releaseLock();

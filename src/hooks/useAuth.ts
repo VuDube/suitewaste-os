@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -10,8 +10,8 @@ export function useAuth() {
   const queryClient = useQueryClient();
   // Zustand Zero-Tolerance: Primitive selectors only
   const token = useAuthStore(s => s.token);
-  const user = useAuthStore(s => s.user);
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const user = useAuthStore(s => s.user);
   const setUser = useAuthStore(s => s.setUser);
   const logout = useAuthStore(s => s.logout);
   const { data, isLoading, isError, error } = useQuery({
@@ -23,7 +23,6 @@ export function useAuth() {
         headers: { Authorization: `Bearer ${activeToken}` },
       });
     },
-    // Only run if we have a token but maybe not a full user object yet
     enabled: !!(token || localStorage.getItem('token')),
     retry: (failureCount, err: any) => {
       if (err?.status === 401) return false;
@@ -39,14 +38,13 @@ export function useAuth() {
   useEffect(() => {
     if (isError) {
       const errStatus = (error as any)?.status;
-      // Specifically target 401 Unauthorized or missing token errors
       if (errStatus === 401 || !localStorage.getItem('token')) {
         logout();
         queryClient.clear();
         if (location.pathname !== '/login') {
-          navigate('/login', { 
-            replace: true, 
-            state: { from: location.pathname, reason: 'session_expired' } 
+          navigate('/login', {
+            replace: true,
+            state: { from: location.pathname, reason: 'session_expired' }
           });
         }
       }

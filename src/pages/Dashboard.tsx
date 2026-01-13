@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Weight, PieChart as PieChartIcon, Truck, ShoppingCart, Landmark, ArrowUpRight, History } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { useOfflineStore } from '@/stores/useOfflineStore';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -26,12 +26,14 @@ const KpiCard = memo(({ title, value, icon: Icon, isLoading, color = "text-foreg
   </Card>
 ));
 export function Dashboard() {
-  const { user } = useAuth();
-  const totalPending = useOfflineStore(s => s.totalPending());
-  const { data: dashboardData, isLoading } = useQuery({ 
-    queryKey: ['dashboard'], 
+  const userRole = useAuthStore(s => s.user?.role);
+  const pendingLedgerCount = useOfflineStore(s => s.pendingLedgerEntries.length);
+  const pendingTransactionCount = useOfflineStore(s => s.pendingTransactions.length);
+  const totalPending = pendingLedgerCount + pendingTransactionCount;
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ['dashboard'],
     queryFn: () => api<any>('/api/dashboard'),
-    enabled: !!user 
+    enabled: !!userRole
   });
   const summary = dashboardData?.summary || {};
   return (
@@ -41,7 +43,7 @@ export function Dashboard() {
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
             <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">Command</h1>
             <div className="flex items-center gap-3">
-              <Badge variant="outline" className="font-black border-primary/20 text-primary px-3">{user?.role}</Badge>
+              <Badge variant="outline" className="font-black border-primary/20 text-primary px-3">{userRole}</Badge>
               {totalPending > 0 && <Badge className="bg-orange-600 animate-pulse">{totalPending} Queued</Badge>}
             </div>
           </motion.div>
@@ -77,18 +79,10 @@ export function Dashboard() {
               <CardContent className="p-8 flex flex-col items-center text-center text-primary-foreground space-y-4">
                  <Weight className="h-12 w-12" />
                  <h3 className="text-xl font-black uppercase tracking-tighter">Quick Weigh</h3>
-                 <p className="text-sm font-bold opacity-80">Launch industrial scale interface for rapid capture.</p>
+                 <p className="text-sm font-bold opacity-80">Launch industrial scale interface.</p>
                  <Button asChild variant="secondary" className="w-full h-14 rounded-2xl font-black uppercase tracking-widest touch-haptic">
                     <Link to="/quick-weight">Initialize POS</Link>
                  </Button>
-              </CardContent>
-            </Card>
-            <Card className="glass-panel border-none">
-              <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Market Link</CardTitle></CardHeader>
-              <CardContent>
-                <Button asChild variant="outline" className="w-full h-12 rounded-xl font-bold touch-haptic">
-                  <Link to="/marketplace">Browse Inventory</Link>
-                </Button>
               </CardContent>
             </Card>
           </section>

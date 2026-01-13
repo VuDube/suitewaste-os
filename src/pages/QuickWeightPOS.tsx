@@ -1,5 +1,4 @@
 import React, { useState, memo } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,16 +8,15 @@ import { useMultiScale } from "@/hooks/useMultiScale";
 import { usePrinter } from "@/hooks/usePrinter";
 import { useOfflineStore } from "@/stores/useOfflineStore";
 import { cn } from "@/lib/utils";
-import { Cable, Loader2, Send, XCircle, BrainCircuit, Sparkles, Printer, Activity, History } from "lucide-react";
+import { Cable, Send, XCircle, BrainCircuit, Sparkles, Printer, Activity, History } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-import type { Supplier, WasteStreamType } from "@shared/types";
-import { v4 as uuid } from 'uuid';
+import type { Supplier } from "@shared/types";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/PageLayout";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 const WeightDisplay = memo(({ weight, status }: { weight: number, status: string }) => (
   <div className="flex flex-col items-center justify-center py-12">
     <div className="relative">
@@ -28,8 +26,8 @@ const WeightDisplay = memo(({ weight, status }: { weight: number, status: string
         animate={{ opacity: 1, scale: 1 }}
         className={cn(
           "text-weight-clamp block leading-none transition-colors",
-          (status === 'connected' || status === 'parsing') 
-            ? "bg-gradient-to-b from-primary to-primary/60 bg-clip-text text-transparent" 
+          (status === 'connected' || status === 'parsing')
+            ? "bg-gradient-to-b from-primary to-primary/60 bg-clip-text text-transparent"
             : "text-muted-foreground/20"
         )}
       >
@@ -37,7 +35,7 @@ const WeightDisplay = memo(({ weight, status }: { weight: number, status: string
       </motion.span>
       <span className="absolute -bottom-2 -right-12 text-2xl font-black text-muted-foreground uppercase tracking-widest">kg</span>
     </div>
-    <Badge variant="outline" className="mt-4 gap-2 px-4 py-1.5 font-black uppercase tracking-widest animate-fade-in">
+    <Badge variant="outline" className="mt-4 gap-2 px-4 py-1.5 font-black uppercase tracking-widest">
       {(status === 'connected' || status === 'parsing') ? (
         <>
           <Activity className="h-3 w-3 text-emerald-500 animate-pulse" />
@@ -58,11 +56,12 @@ export function QuickWeightPOS() {
   const { status: printerStatus, connect: connectPrinter } = usePrinter();
   const addLedgerEntry = useOfflineStore(s => s.addLedgerEntry);
   const addTransaction = useOfflineStore(s => s.addTransaction);
-  const totalPending = useOfflineStore(s => s.totalPending());
+  const pendingLedgerCount = useOfflineStore(s => s.pendingLedgerEntries.length);
+  const pendingTransactionCount = useOfflineStore(s => s.pendingTransactions.length);
+  const totalPending = pendingLedgerCount + pendingTransactionCount;
   const [supplierId, setSupplierId] = useState<string>('');
   const [materialType, setMaterialType] = useState("");
   const [amount, setAmount] = useState("");
-  const [isAiClassifying, setIsAiClassifying] = useState(false);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => api<Supplier[]>('/api/suppliers'),
@@ -73,7 +72,7 @@ export function QuickWeightPOS() {
       toast.error("Invalid capture data");
       return;
     }
-    const ledgerEntryId = uuid();
+    const ledgerEntryId = crypto.randomUUID();
     addLedgerEntry({
       id: ledgerEntryId,
       supplier_id: supplierId,
@@ -85,7 +84,7 @@ export function QuickWeightPOS() {
     addTransaction({
       ledger_entry_id: ledgerEntryId,
       amount: parseFloat(amount) || 0,
-      epr_fee: weight * 0.05, // 5% EPR fee mock
+      epr_fee: weight * 0.05,
       currency: 'ZAR',
     });
     setMaterialType("");
@@ -95,7 +94,6 @@ export function QuickWeightPOS() {
   return (
     <PageLayout fullBleed>
       <div className="flex flex-col min-h-full space-y-8 animate-fade-in">
-        {/* Hero Weight Area */}
         <section className="relative overflow-hidden rounded-3xl bg-surface-container/50 border border-white/5 p-8 flex flex-col items-center justify-center shadow-elevation-3">
           <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
           <WeightDisplay weight={weight} status={status} />
@@ -108,70 +106,60 @@ export function QuickWeightPOS() {
             </Button>
           </div>
         </section>
-        {/* Input Controls */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mx-auto">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-            <Card className="glass-panel border-none">
-              <CardContent className="p-6 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Supplier / Partner</label>
-                  {isLoadingSuppliers ? <Skeleton className="h-14 w-full rounded-2xl" /> : (
-                    <Select onValueChange={setSupplierId} value={supplierId}>
-                      <SelectTrigger className="h-14 rounded-2xl border-2 font-bold focus:border-primary shadow-elevation-1">
-                        <SelectValue placeholder="Identify Supplier" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-2xl">
-                        {suppliers?.map(s => <SelectItem key={s.id} value={s.id} className="h-12">{s.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Material Stream</label>
-                  <div className="flex gap-3">
-                    <Input 
-                      placeholder="e.g. Copper Grade A" 
-                      value={materialType} 
-                      onChange={e => setMaterialType(e.target.value)} 
-                      className="h-14 rounded-2xl border-2 font-bold focus:border-primary shadow-elevation-1"
-                    />
-                    <Button variant="secondary" className="h-14 w-14 p-0 rounded-2xl border-2 touch-haptic">
-                      <BrainCircuit className="h-6 w-6 text-primary" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-            <Card className="glass-panel border-none">
-              <CardContent className="p-6 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Unit Price (ZAR/kg)</label>
-                  <Input 
-                    type="number" 
-                    placeholder="0.00" 
-                    value={amount} 
-                    onChange={e => setAmount(e.target.value)} 
-                    className="h-14 rounded-2xl border-2 font-mono font-bold text-lg shadow-elevation-1"
+          <Card className="glass-panel border-none">
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Supplier / Partner</label>
+                {isLoadingSuppliers ? <Skeleton className="h-14 w-full rounded-2xl" /> : (
+                  <Select onValueChange={setSupplierId} value={supplierId}>
+                    <SelectTrigger className="h-14 rounded-2xl border-2 font-bold focus:border-primary shadow-elevation-1">
+                      <SelectValue placeholder="Identify Supplier" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl">
+                      {suppliers?.map(s => <SelectItem key={s.id} value={s.id} className="h-12">{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Material Stream</label>
+                <div className="flex gap-3">
+                  <Input
+                    placeholder="e.g. Copper Grade A"
+                    value={materialType}
+                    onChange={e => setMaterialType(e.target.value)}
+                    className="h-14 rounded-2xl border-2 font-bold focus:border-primary shadow-elevation-1"
                   />
+                  <Button variant="secondary" className="h-14 w-14 p-0 rounded-2xl border-2 touch-haptic">
+                    <BrainCircuit className="h-6 w-6 text-primary" />
+                  </Button>
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-primary/5 border border-primary/20">
-                  <span className="text-xs font-bold uppercase text-primary">Pending Sync</span>
-                  <Badge className="font-mono">{totalPending} Items</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="glass-panel border-none">
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Unit Price (ZAR/kg)</label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                  className="h-14 rounded-2xl border-2 font-mono font-bold text-lg shadow-elevation-1"
+                />
+              </div>
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-primary/5 border border-primary/20">
+                <span className="text-xs font-bold uppercase text-primary">Pending Sync</span>
+                <Badge className="font-mono">{totalPending} Items</Badge>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-        {/* Extended FAB */}
-        <motion.div 
-          className="fixed bottom-28 right-6 z-50 md:right-12"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <Button 
-            size="lg" 
+        <motion.div className="fixed bottom-28 right-6 z-50 md:right-12" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button
+            size="lg"
             onClick={handleCapture}
             disabled={weight <= 0 || !supplierId}
             className="h-20 px-8 rounded-3xl shadow-elevation-12 bg-primary text-primary-foreground font-black text-xl uppercase tracking-widest flex gap-3 group"

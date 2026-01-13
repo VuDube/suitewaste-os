@@ -1,26 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-// Add TypeScript definitions for the Web Serial API
-// This ensures type safety and autocompletion for the Web Serial API.
-type SerialPortRequestOptions = {
-  filters?: { usbVendorId?: number; usbProductId?: number }[];
-};
-type SerialPort = EventTarget & {
-  open(options: { baudRate: number }): Promise<void>;
-  close(): Promise<void>;
-  readable: ReadableStream<Uint8Array> | null;
-  writable: WritableStream<Uint8Array> | null;
-  addEventListener(type: 'disconnect', listener: (ev: Event) => any, options?: boolean | AddEventListenerOptions): void;
-  removeEventListener(type: 'disconnect', listener: (ev: Event) => any, options?: boolean | EventListenerOptions): void;
-};
-declare global {
-  interface Navigator {
-    serial: {
-      requestPort(options?: SerialPortRequestOptions): Promise<SerialPort>;
-      getPorts(): Promise<SerialPort[]>;
-    };
-  }
-}
 type ScaleStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'parsing';
 interface SerialScale {
   weight: number;
@@ -42,15 +21,14 @@ export function useSerialScale(): SerialScale {
       try {
         await readerRef.current.cancel();
       } catch (error) {
-        // Ignore cancel error, it's expected on disconnect
+        // Ignore cancel error
       } finally {
-        // This check is important because the reader might already be released
         if (readerRef.current) {
-            try {
-                readerRef.current.releaseLock();
-            } catch (e) {
-                // Lock might already be released
-            }
+          try {
+            readerRef.current.releaseLock();
+          } catch (e) {
+            // Lock might already be released
+          }
         }
         readerRef.current = null;
       }
@@ -80,9 +58,7 @@ export function useSerialScale(): SerialScale {
     while (portRef.current?.readable && keepReadingRef.current) {
       try {
         const { value, done } = await readerRef.current.read();
-        if (done) {
-          break;
-        }
+        if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split(/[\r\n]+/);
         if (lines.length > 1) {
@@ -94,7 +70,7 @@ export function useSerialScale(): SerialScale {
           buffer = lines[lines.length - 1];
         }
       } catch (error) {
-        if (keepReadingRef.current) { // Only show error if not intentionally disconnecting
+        if (keepReadingRef.current) {
           toast.error('Scale read error', { description: 'The connection was lost.' });
           setStatus('error');
         }
@@ -104,7 +80,7 @@ export function useSerialScale(): SerialScale {
   }, []);
   const connect = useCallback(async () => {
     if (!('serial' in navigator)) {
-      toast.error('Web Serial API not supported', { description: 'Please use a compatible browser like Chrome or Edge.' });
+      toast.error('Web Serial API not supported', { description: 'Please use a compatible browser.' });
       setStatus('error');
       return;
     }
