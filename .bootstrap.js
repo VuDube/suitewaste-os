@@ -90,7 +90,8 @@ function runSetupCommands() {
     "bun add buffer",
     "bun add framer-motion lucide-react clsx tailwind-merge",
     "bun add uuid",
-    "bun install @types/w3c-web-usb @types/w3c-web-serial"
+    "bun install @types/w3c-web-usb @types/w3c-web-serial",
+    "bun remove uuid"
 ];
     
     if (commands.length === 0) {
