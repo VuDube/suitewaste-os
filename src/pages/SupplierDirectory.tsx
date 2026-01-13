@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Toaster, toast } from "sonner";
 import { PlusCircle, Trash2, Search, Loader2, ShieldAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -72,7 +73,6 @@ export function SupplierDirectory() {
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     (s.epr_number && s.epr_number.toLowerCase().includes(search.toLowerCase()))
   );
-  const totalPages = Math.ceil(filteredSuppliers.length / PAGE_SIZE);
   const paginatedSuppliers = filteredSuppliers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   if (!canManage) {
     return (
@@ -93,7 +93,11 @@ export function SupplierDirectory() {
           <p className="text-muted-foreground mt-1">Manage partner records and EPR compliance.</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild><Button className="h-14 px-8 text-lg font-semibold"><PlusCircle className="mr-2 h-5 w-5" /> Add Supplier</Button></DialogTrigger>
+          <DialogTrigger asChild>
+            <Button className="h-14 px-8 text-lg font-semibold">
+              <PlusCircle className="mr-2 h-5 w-5" /> Add Supplier
+            </Button>
+          </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Create New Supplier</DialogTitle>

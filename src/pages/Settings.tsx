@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { ShieldAlert, Download, Loader2, Database, Trash2, History, Briefcase, FileCheck, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
@@ -43,7 +44,11 @@ const DataGovernanceTab = memo(() => {
   return (
     <div className="space-y-6">
       <Card className="bg-card/80 border-border">
-        <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase tracking-tighter"><Database className="h-5 w-5 text-primary" /> Data Governance</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 font-black uppercase tracking-tighter">
+            <Database className="h-5 w-5 text-primary" /> Data Governance
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-8">
           <div className="flex flex-col md:flex-row items-start justify-between gap-6 p-6 rounded-2xl border bg-accent/5">
             <div className="space-y-1">
@@ -86,7 +91,9 @@ export function Settings() {
         <div className="max-w-2xl mx-auto flex flex-col items-center justify-center py-20 text-center space-y-6">
           <ShieldAlert className="h-20 w-20 text-destructive" />
           <h2 className="text-3xl font-black uppercase tracking-tighter">Admin Access Only</h2>
-          <Button asChild variant="outline" className="h-12 rounded-xl font-bold"><Link to="/">Return to Dashboard</Link></Button>
+          <Button asChild variant="outline" className="h-12 rounded-xl font-bold">
+            <Link to="/">Return to Dashboard</Link>
+          </Button>
         </div>
       </PageLayout>
     );
