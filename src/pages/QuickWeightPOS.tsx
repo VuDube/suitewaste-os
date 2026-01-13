@@ -1,6 +1,6 @@
 import React, { useState, memo, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -119,13 +119,13 @@ export function QuickWeightPOS() {
         </section>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 w-full">
           <div className="md:col-span-8 space-y-6">
-            <Card className="glass-panel border-none">
+            <Card className="glass-panel border-none shadow-elevation-1">
               <CardContent className="p-6 space-y-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Supplier / Scrap Vendor</label>
                   {isLoadingSuppliers ? <Skeleton className="h-14 w-full rounded-2xl" /> : (
                     <Select onValueChange={setSupplierId} value={supplierId}>
-                      <SelectTrigger className="h-14 rounded-2xl border-2 font-bold focus:border-primary shadow-elevation-1">
+                      <SelectTrigger className="h-14 rounded-2xl border-2 font-bold focus:border-primary">
                         <SelectValue placeholder="Identify Partner" />
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl">
@@ -150,7 +150,7 @@ export function QuickWeightPOS() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="glass-panel border-none">
+            <Card className="glass-panel border-none shadow-elevation-1">
               <CardContent className="p-6 space-y-6">
                 <div className="flex flex-col sm:flex-row gap-6">
                   <div className="flex-1 space-y-2">
@@ -161,7 +161,7 @@ export function QuickWeightPOS() {
                         placeholder="0.00"
                         value={amount}
                         onChange={e => setAmount(e.target.value)}
-                        className="h-14 rounded-2xl border-2 font-mono font-black text-lg shadow-elevation-1 pr-16"
+                        className="h-14 rounded-2xl border-2 font-mono font-black text-lg pr-16"
                       />
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground font-black text-xs uppercase">ZAR</div>
                     </div>
@@ -180,7 +180,7 @@ export function QuickWeightPOS() {
             </Card>
           </div>
           <div className="md:col-span-4 space-y-6">
-            <Card className="glass-panel border-none h-full">
+            <Card className="glass-panel border-none h-full shadow-elevation-1">
               <CardHeader>
                 <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                   <ShieldAlert className="h-4 w-4 text-primary" /> Integrity Analysis
@@ -202,7 +202,7 @@ export function QuickWeightPOS() {
             </Card>
           </div>
         </div>
-        <motion.div 
+        <motion.div
           className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-6 md:bottom-12"
           initial={{ y: 100 }}
           animate={{ y: 0 }}

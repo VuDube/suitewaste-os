@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import { 
-  HardHat, 
-  Menu, 
-  LayoutDashboard, 
-  Weight, 
-  BookOpen, 
-  Settings2, 
-  LogOut, 
-  Landmark, 
-  Briefcase, 
-  Truck, 
-  ShoppingCart, 
-  Factory, 
-  ShieldCheck, 
-  MessageCircle, 
+import {
+  HardHat,
+  Menu,
+  LayoutDashboard,
+  Weight,
+  BookOpen,
+  Settings2,
+  LogOut,
+  Landmark,
+  Briefcase,
+  Truck,
+  ShoppingCart,
+  Factory,
+  ShieldCheck,
+  MessageCircle,
   Zap,
-  TrendingUp
+  TrendingUp,
+  Box
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
@@ -28,6 +29,7 @@ import { toast } from 'sonner';
 const navItems = [
   { href: '/', label: 'Home', icon: LayoutDashboard, roles: ['operator', 'manager', 'admin', 'auditor', 'buyer', 'producer'] },
   { href: '/quick-weight', label: 'POS', icon: Weight, roles: ['operator', 'manager', 'admin'] },
+  { href: '/operations', label: 'Yard', icon: Box, roles: ['manager', 'admin'] },
   { href: '/compliance', label: 'Legal', icon: ShieldCheck, roles: ['manager', 'admin', 'auditor'] },
   { href: '/ledger', label: 'Audit', icon: BookOpen, roles: ['manager', 'admin', 'auditor'] },
   { href: '/finance', label: 'Finance', icon: Landmark, roles: ['manager', 'admin', 'auditor'] },
@@ -39,7 +41,6 @@ const navItems = [
 ];
 export function GlobalNav() {
   const [isMobileMoreOpen, setMobileMoreOpen] = useState(false);
-  // Zustand Zero-Tolerance Selectors
   const userRole = useAuthStore(s => s.user?.role);
   const userFeatures = useAuthStore(s => s.user?.features);
   const logout = useAuthStore(s => s.logout);
@@ -103,10 +104,10 @@ export function GlobalNav() {
               <span className="text-[9px] font-black uppercase tracking-widest">More</span>
             </button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="bg-background/95 backdrop-blur-3xl rounded-t-[3rem] p-8 border-t border-white/10" aria-labelledby="more-nav-title" aria-describedby="more-nav-desc">
+          <SheetContent side="bottom" className="bg-background/95 backdrop-blur-3xl rounded-t-[3rem] p-8 border-t border-white/10">
             <SheetHeader className="mb-6">
-              <SheetTitle id="more-nav-title" className="text-3xl font-black uppercase tracking-tighter">Enterprise OS</SheetTitle>
-              <SheetDescription id="more-nav-desc" className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">SuiteWaste Industrial Hub</SheetDescription>
+              <SheetTitle className="text-3xl font-black uppercase tracking-tighter">Enterprise OS</SheetTitle>
+              <SheetDescription className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">SuiteWaste Industrial Hub</SheetDescription>
             </SheetHeader>
             <div className="grid grid-cols-3 gap-3 mb-10">
               {moreItems.map(item => (

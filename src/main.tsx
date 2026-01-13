@@ -25,6 +25,7 @@ import { FleetPortal } from '@/pages/FleetPortal';
 import { BuyerPortal } from '@/pages/BuyerPortal';
 import { ProducerPortal } from '@/pages/ProducerPortal';
 import { Wingman } from '@/pages/Wingman';
+import { OperationsHub } from '@/pages/OperationsHub';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -43,12 +44,13 @@ if (typeof window !== 'undefined') {
   (window as any).queryClient = queryClient;
 }
 const router = createBrowserRouter([
-  { path: "/", element: <Dashboard />, errorElement: <RouteErrorBoundary /> },
   { path: "/login", element: <Login />, errorElement: <RouteErrorBoundary /> },
+  { path: "/", element: <Dashboard />, errorElement: <RouteErrorBoundary /> },
   { path: "/quick-weight", element: <QuickWeightPOS />, errorElement: <RouteErrorBoundary /> },
   { path: "/suppliers", element: <SupplierDirectory />, errorElement: <RouteErrorBoundary /> },
   { path: "/ledger", element: <InventoryLedger />, errorElement: <RouteErrorBoundary /> },
   { path: "/transactions", element: <Transactions />, errorElement: <RouteErrorBoundary /> },
+  { path: "/operations", element: <OperationsHub />, errorElement: <RouteErrorBoundary /> },
   { path: "/finance", element: <FinanceLedger />, errorElement: <RouteErrorBoundary /> },
   { path: "/compliance", element: <ComplianceHub />, errorElement: <RouteErrorBoundary /> },
   { path: "/wingman", element: <Wingman />, errorElement: <RouteErrorBoundary /> },
@@ -61,15 +63,6 @@ const router = createBrowserRouter([
   { path: "/settings", element: <Settings />, errorElement: <RouteErrorBoundary /> },
   { path: "/chat", element: <Chat />, errorElement: <RouteErrorBoundary /> },
 ]);
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    if (import.meta.env.DEV) return;
-    navigator.serviceWorker.register('/sw.js').then(
-      (registration) => { console.log('SW registered:', registration.scope); },
-      (err) => { console.error('SW registration failed:', err); }
-    );
-  });
-}
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
