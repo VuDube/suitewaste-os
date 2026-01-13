@@ -89,7 +89,8 @@ function runSetupCommands() {
     "bun add buffer@^6.1.1 jsonwebtoken@^9.2.1",
     "bun add buffer",
     "bun add framer-motion lucide-react clsx tailwind-merge",
-    "bun add uuid"
+    "bun add uuid",
+    "bun install @types/w3c-web-usb @types/w3c-web-serial"
 ];
     
     if (commands.length === 0) {
