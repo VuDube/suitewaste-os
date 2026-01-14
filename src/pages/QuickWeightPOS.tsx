@@ -28,7 +28,7 @@ const WeightDisplay = memo(({ weight, status }: { weight: number, status: string
         animate={{ opacity: 1, scale: 1 }}
         className={cn(
           "text-weight-clamp block leading-none transition-colors",
-          (status === 'connected' || status === 'parsing')
+          (status === 'connected' || status === 'parsing' || status === 'manual')
             ? "bg-gradient-to-b from-primary to-primary/60 bg-clip-text text-transparent"
             : "text-muted-foreground/20"
         )}
@@ -38,7 +38,12 @@ const WeightDisplay = memo(({ weight, status }: { weight: number, status: string
       <span className="absolute -bottom-2 -right-12 text-2xl font-black text-muted-foreground uppercase tracking-widest">kg</span>
     </div>
     <Badge variant="outline" className="mt-4 gap-2 px-4 py-1.5 font-black uppercase tracking-widest">
-      {(status === 'connected' || status === 'parsing') ? (
+      {status === 'manual' ? (
+        <>
+          <ShieldAlert className="h-3 w-3 text-amber-500" />
+          <span className="text-amber-500 font-black uppercase">Manual Entry</span>
+        </>
+      ) : (status === 'connected' || status === 'parsing') ? (
         <>
           <Activity className="h-3 w-3 text-emerald-500 animate-pulse" />
           <span className="text-emerald-500">Live Scale Stream</span>
@@ -57,13 +62,25 @@ export function QuickWeightPOS() {
   const { weight, status, connect, devices } = useMultiScale();
   const { status: printerStatus, connect: connectPrinter } = usePrinter();
   const { getPriceForMaterial } = useLME();
+  const [manualStr, setManualStr] = useState('');
+  const [manualWeight, setManualWeight] = useState(0.0);
   const addLedgerEntry = useOfflineStore(s => s.addLedgerEntry);
   const addTransaction = useOfflineStore(s => s.addTransaction);
   const totalPending = useOfflineStore(s => s.pendingLedgerEntries.length + s.pendingTransactions.length);
+
+  React.useEffect(() => {
+    if(status === 'connected' || status === 'parsing') {
+      setManualStr('');
+      setManualWeight(0);
+    }
+  }, [status]);
   const [supplierId, setSupplierId] = useState<string>('');
   const [materialType, setMaterialType] = useState("");
   const [amount, setAmount] = useState("");
   const marketPrice = useMemo(() => getPriceForMaterial(materialType), [materialType, getPriceForMaterial]);
+
+  const effectiveWeight = (status === 'connected' || status === 'parsing') ? weight : manualWeight;
+  const effectiveStatus = status === 'disconnected' ? 'manual' : status;
   const { data: suppliers, isLoading: isLoadingSuppliers } = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => api<Supplier[]>('/api/suppliers'),
@@ -74,12 +91,43 @@ export function QuickWeightPOS() {
     if (!supplierId) return 0;
     const supplier = suppliers?.find(s => s.id === supplierId);
     if (supplier && !supplier.is_weee_compliant) score += 15;
-    if (weight > 500) score += 20;
+    if (effectiveWeight > 500) score += 20;
     if (parseFloat(amount) > (marketPrice?.priceZAR || 0) * 1.2) score += 30;
     return Math.min(score, 100);
-  }, [supplierId, suppliers, weight, amount, marketPrice]);
+  }, [supplierId, suppliers, effectiveWeight, amount, marketPrice]);
+  const handleNum = (digit: string) => {
+    const newStr = manualStr + digit;
+    setManualStr(newStr);
+    const num = parseFloat(newStr);
+    setManualWeight(isNaN(num) ? 0 : num);
+  };
+
+  const handleClear = () => {
+    setManualStr('');
+    setManualWeight(0);
+  };
+
+  const handleDot = () => {
+    if(!manualStr.includes('.')) handleNum('.');
+  };
+
+  const handleBackspace = () => {
+    const newStr = manualStr.slice(0, -1);
+    setManualStr(newStr);
+    setManualWeight(parseFloat(newStr) || 0);
+  };
+
+  const handleManualConfirm = () => {
+    if(manualWeight > 0) {
+      toast.success(`Manual weight locked: ${manualWeight.toFixed(2)} kg`);
+    } else {
+      toast.error('Enter valid weight > 0 kg');
+    }
+  };
+
   const handleCapture = () => {
-    if (weight <= 0 || !supplierId || !materialType) {
+    const captureWeight = effectiveWeight;
+    if (captureWeight <= 0 || !supplierId || !materialType) {
       toast.error("Incomplete Capture Data");
       return;
     }
@@ -88,26 +136,29 @@ export function QuickWeightPOS() {
       id: ledgerEntryId,
       supplier_id: supplierId,
       material_type: materialType.trim(),
-      weight_kg: weight,
+      weight_kg: captureWeight,
       operator_id: user?.id,
-      device_id: devices[0]?.id || 'main-scale',
+      device_id: effectiveStatus === 'manual' ? 'manual-keypad' : devices[0]?.id || 'main-scale',
     });
     addTransaction({
       ledger_entry_id: ledgerEntryId,
       amount: parseFloat(amount) || 0,
-      epr_fee: weight * 0.05,
+      epr_fee: captureWeight * 0.05,
       currency: 'ZAR',
     });
     setMaterialType("");
     setAmount("");
-    toast.success("Transaction Securely Queued", { icon: <History className="h-4 w-4" /> });
+    toast.success(
+      `Transaction Securely Queued${effectiveStatus === 'manual' ? ' (Manual Entry)' : ''}`, 
+      { icon: <History className="h-4 w-4" /> }
+    );
   };
   return (
     <PageLayout fullBleed>
       <div className="flex flex-col min-h-full space-y-8 animate-fade-in max-w-5xl mx-auto px-4 pb-32">
         <section className="relative overflow-hidden rounded-3xl bg-surface-container/50 border border-white/5 p-8 flex flex-col items-center justify-center shadow-elevation-3 mt-4">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent pointer-events-none" />
-          <WeightDisplay weight={weight} status={status} />
+          <WeightDisplay weight={effectiveWeight} status={effectiveStatus} />
           <div className="grid grid-cols-2 gap-4 w-full max-w-lg mt-4">
             <Button size="lg" variant="secondary" className="h-16 rounded-2xl font-bold touch-haptic" onClick={connect} disabled={status === 'connected'}>
               <Cable className="mr-2 h-6 w-6" /> Link Scale
@@ -116,6 +167,67 @@ export function QuickWeightPOS() {
               <Printer className={cn("mr-2 h-6 w-6", printerStatus === 'connected' ? "text-primary" : "")} /> Printer
             </Button>
           </div>
+          {(status !== 'connected' && status !== 'parsing') && (
+            <>
+              <div className="w-full max-w-sm mx-auto mb-6">
+                <Input 
+                  type="number" 
+                  step="0.01" 
+                  value={manualStr} 
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^\d.]/g, "");
+                    if(val.endsWith('.')) setManualStr(val);
+                    else setManualStr(val);
+                    setManualWeight(parseFloat(val) || 0);
+                  }} 
+                  placeholder="0.00" 
+                  className="h-20 text-4xl font-mono text-center rounded-3xl mx-auto block shadow-2xl border-2 border-amber-500/50 bg-amber-500/5" 
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4 w-full max-w-md mx-auto p-6 rounded-3xl bg-gradient-to-b from-surface-container/90 to-white/10 backdrop-blur-xl border border-amber-400/20 shadow-2xl">
+                {[['1','2','3'],['4','5','6'],['7','8','9']].map((row,i)=>(
+                  <div key={i} className="flex gap-4">
+                    {row.map(d=>(
+                      <Button
+                        key={d}
+                        variant="outline"
+                        size="lg"
+                        className="h-[60px] flex-1 rounded-2xl font-black text-xl shadow-md hover:shadow-lg transition-all touch-haptic"
+                        onClick={()=>handleNum(d)}
+                      >
+                        {d}
+                      </Button>
+                    ))}
+                  </div>
+                ))}
+                <div className="col-span-3 flex gap-4">
+                  <Button variant="outline" size="lg" className="h-[60px] flex-[2] rounded-2xl font-black text-xl shadow-md hover:shadow-lg transition-all touch-haptic" onClick={() => handleNum('0')}>0</Button>
+                  <div className="flex-[1]" />
+                </div>
+                <div className="flex gap-4 col-span-3 mt-3">
+                  <Button variant="destructive" className="h-[60px] flex-1 rounded-2xl font-black text-xl shadow-md" onClick={handleBackspace}>⌫</Button>
+                  <Button variant="outline" className="h-[60px] flex-1 rounded-2xl font-black text-xl shadow-md" onClick={handleDot}>.</Button>
+                  <div className="flex-1" />
+                  <Button className="h-[60px] w-[80px] bg-amber-500 hover:bg-amber-600 text-amber-foreground font-black text-lg rounded-2xl shadow-lg" onClick={handleManualConfirm}>OK</Button>
+                </div>
+                <Button className="col-span-3 h-[60px] mt-4 bg-primary shadow-xl" onClick={connect} disabled={status==='connecting'}>
+                  <Cable className="mr-2 h-5 w-5" /> Retry Scale Link
+                </Button>
+              </div>
+              <Card className="mt-6 max-w-md mx-auto border-amber-200/50 bg-amber-500/5">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-xs uppercase tracking-widest text-amber-600 font-black">Scale Connection Guide</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 text-xs space-y-2 text-muted-foreground leading-tight">
+                  <p><strong>1.</strong> Plug USB securely</p>
+                  <p><strong>2.</strong> Click "Retry Scale Link"</p>
+                  <p><strong>3.</strong> Allow browser access</p>
+                  <p><strong>4.</strong> Select correct COM port</p>
+                  <p><strong>5.</strong> Verify baud 9600 on device</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </section>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 w-full">
           <div className="md:col-span-8 space-y-6">
@@ -210,7 +322,7 @@ export function QuickWeightPOS() {
           <Button
             size="lg"
             onClick={handleCapture}
-            disabled={weight <= 0 || !supplierId || !materialType}
+            disabled={effectiveWeight <= 0 || !supplierId || !materialType}
             className="w-full h-20 rounded-3xl shadow-elevation-12 bg-primary text-primary-foreground font-black text-xl uppercase tracking-widest flex gap-3 group active:scale-95 transition-all"
           >
             <Sparkles className="h-8 w-8 transition-transform group-hover:rotate-12" />

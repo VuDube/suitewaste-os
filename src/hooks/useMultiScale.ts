@@ -14,92 +14,108 @@ export function useMultiScale() {
   const [devices, setDevices] = useState<DeviceHealth[]>([]);
   const portRef = useRef<SerialPort | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
-  const keepReadingRef = useRef<boolean>(true);
   const disconnect = useCallback(async () => {
-    keepReadingRef.current = false;
-    if (readerRef.current) {
-      try {
-        await readerRef.current.cancel();
-      } catch (e) {
-        console.warn('Reader cancel failed', e);
-      }
-      try {
+    try {
+      if (readerRef.current) {
+        await readerRef.current.cancel('Scale disconnected');
         readerRef.current.releaseLock();
-      } catch (e) {
-        // Lock may already be released
       }
-      readerRef.current = null;
-    }
-    if (portRef.current) {
-      try {
+      if (portRef.current) {
         await portRef.current.close();
-      } catch (e) {
-        console.error('Failed to close serial port', e);
       }
+    } catch (err) {
+      console.warn('Disconnect cleanup failed:', err);
+    } finally {
+      readerRef.current = null;
       portRef.current = null;
+      setStatus('disconnected');
+      setWeight(0);
+      setDevices([]);
     }
-    setStatus('disconnected');
-    setWeight(0.0);
   }, []);
   const connect = useCallback(async () => {
     if (!('serial' in navigator)) {
       toast.error('Web Serial not supported');
       return;
     }
+    if (portRef.current) {
+      await disconnect();
+    }
     setStatus('connecting');
     try {
       const port = await navigator.serial.requestPort();
       await port.open({ baudRate: 9600 });
       portRef.current = port;
-      keepReadingRef.current = true;
-      setStatus('connected');
       if (!port.readable) {
         throw new Error('Port not readable');
       }
       const reader = port.readable.getReader();
       readerRef.current = reader;
-      const decoder = new TextDecoder();
-      let buffer = '';
-      setDevices([{ id: 'main-scale', name: 'Primary Scale', status: 'connected', lastSeen: Date.now() }]);
-      while (keepReadingRef.current) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split(/[\r\n]+/);
-        if (lines.length > 1) {
-          const completeLine = lines[lines.length - 2];
-          const match = completeLine.match(WEIGHT_REGEX);
-          if (match && match[1]) {
-            const parsedWeight = parseFloat(match[1]);
-            setWeight(parsedWeight);
-            setDevices(prev => prev.map(d =>
-              d.id === 'main-scale'
-                ? { ...d, lastSeen: Date.now(), status: 'parsing' as ScaleStatus }
-                : d
-            ));
-          }
-          buffer = lines[lines.length - 1];
-        }
-      }
+      setStatus('connected');
+      setDevices([{ id: 'main-scale', name: 'Primary Scale', status: 'connected' as ScaleStatus, lastSeen: Date.now() }]);
+      startReadLoop().catch(handleReadLoopError);
     } catch (err) {
-      console.error('Scale connection error:', err);
+      console.error('Scale connection error:', err instanceof Error ? `${err.name}: ${err.message}. Stack: ${err.stack || 'no stack'}` : JSON.stringify(err, null, 2));
       setStatus('error');
       if (err instanceof Error && err.name !== 'NotFoundError') {
         toast.error('Scale connection failed', { description: err.message });
       }
-      portRef.current = null;
+      await disconnect();
     }
   }, []);
+
+  const handleReadLoopError = useCallback(async (err: unknown) => {
+    console.error('Scale read loop error:', err instanceof Error ? `${err.name}: ${err.message}. Stack: ${err.stack || 'no stack'}` : JSON.stringify(err, null, 2));
+    setStatus('error');
+    toast.error('Scale stream failed');
+    await disconnect();
+  }, [disconnect]);
+
+  const startReadLoop = useCallback(async () => {
+    const reader = readerRef.current;
+    if (!reader) return;
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          const match = line.match(WEIGHT_REGEX);
+          if (match?.[1]) {
+            const w = parseFloat(match[1]);
+            if (!isNaN(w)) {
+              setWeight(w);
+              setDevices(d => d.map(dd =>
+                dd.id === 'main-scale'
+                  ? { ...dd, lastSeen: Date.now(), status: 'parsing' as ScaleStatus }
+                  : dd
+              ));
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Read loop aborted normally');
+        return;
+      }
+      throw err;
+    }
+  }, [setWeight, setDevices]);
   useEffect(() => {
     const interval = setInterval(() => {
-      if (status === 'connected' && !portRef.current) {
+      if (status === 'connected' && (!portRef.current || !portRef.current.readable)) {
         setStatus('failover');
-        toast.warning('Primary scale connection lost. Please reconnect.');
+        toast.warning('Scale connection lost - tap to retry');
       }
     }, 5000);
     return () => {
       clearInterval(interval);
-      disconnect().catch(err => console.error('Cleanup disconnect failed', err));
+      disconnect().catch(err => console.error('Cleanup disconnect failed', err instanceof Error ? `${err.name}: ${err.message}. Stack: ${err.stack || 'no stack'}` : JSON.stringify(err, null, 2)));
     };
   }, [status, disconnect]);
   return { weight, status, connect, disconnect, devices };
