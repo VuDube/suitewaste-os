@@ -33,44 +33,12 @@ export function useMultiScale() {
       setDevices([]);
     }
   }, []);
-  const connect = useCallback(async () => {
-    if (!('serial' in navigator)) {
-      toast.error('Web Serial not supported');
-      return;
-    }
-    if (portRef.current) {
-      await disconnect();
-    }
-    setStatus('connecting');
-    try {
-      const port = await navigator.serial.requestPort();
-      await port.open({ baudRate: 9600 });
-      portRef.current = port;
-      if (!port.readable) {
-        throw new Error('Port not readable');
-      }
-      const reader = port.readable.getReader();
-      readerRef.current = reader;
-      setStatus('connected');
-      setDevices([{ id: 'main-scale', name: 'Primary Scale', status: 'connected' as ScaleStatus, lastSeen: Date.now() }]);
-      startReadLoop().catch(handleReadLoopError);
-    } catch (err) {
-      console.error('Scale connection error:', err instanceof Error ? `${err.name}: ${err.message}. Stack: ${err.stack || 'no stack'}` : JSON.stringify(err, null, 2));
-      setStatus('error');
-      if (err instanceof Error && err.name !== 'NotFoundError') {
-        toast.error('Scale connection failed', { description: err.message });
-      }
-      await disconnect();
-    }
-  }, []);
-
   const handleReadLoopError = useCallback(async (err: unknown) => {
-    console.error('Scale read loop error:', err instanceof Error ? `${err.name}: ${err.message}. Stack: ${err.stack || 'no stack'}` : JSON.stringify(err, null, 2));
+    console.error('Scale read loop error:', err instanceof Error ? `${err.name}: ${err.message}` : JSON.stringify(err));
     setStatus('error');
     toast.error('Scale stream failed');
     await disconnect();
   }, [disconnect]);
-
   const startReadLoop = useCallback(async () => {
     const reader = readerRef.current;
     if (!reader) return;
@@ -100,12 +68,40 @@ export function useMultiScale() {
       }
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        console.log('Read loop aborted normally');
         return;
       }
       throw err;
     }
   }, [setWeight, setDevices]);
+  const connect = useCallback(async () => {
+    if (!('serial' in navigator)) {
+      toast.error('Web Serial not supported');
+      return;
+    }
+    if (portRef.current) {
+      await disconnect();
+    }
+    setStatus('connecting');
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      portRef.current = port;
+      if (!port.readable) {
+        throw new Error('Port not readable');
+      }
+      const reader = port.readable.getReader();
+      readerRef.current = reader;
+      setStatus('connected');
+      setDevices([{ id: 'main-scale', name: 'Primary Scale', status: 'connected' as ScaleStatus, lastSeen: Date.now() }]);
+      startReadLoop().catch(handleReadLoopError);
+    } catch (err) {
+      setStatus('error');
+      if (err instanceof Error && err.name !== 'NotFoundError') {
+        toast.error('Scale connection failed', { description: err.message });
+      }
+      await disconnect();
+    }
+  }, [disconnect, startReadLoop, handleReadLoopError]);
   useEffect(() => {
     const interval = setInterval(() => {
       if (status === 'connected' && (!portRef.current || !portRef.current.readable)) {
@@ -115,7 +111,7 @@ export function useMultiScale() {
     }, 5000);
     return () => {
       clearInterval(interval);
-      disconnect().catch(err => console.error('Cleanup disconnect failed', err instanceof Error ? `${err.name}: ${err.message}. Stack: ${err.stack || 'no stack'}` : JSON.stringify(err, null, 2)));
+      disconnect().catch(err => console.error('Cleanup disconnect failed', err));
     };
   }, [status, disconnect]);
   return { weight, status, connect, disconnect, devices };
