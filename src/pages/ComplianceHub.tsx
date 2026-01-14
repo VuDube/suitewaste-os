@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ShieldCheck, FileText, Gavel, Scale, Fingerprint, Download, Loader2, AlertTriangle, BookOpen, UserCheck, Archive, Zap } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from "@/lib/utils";
 export function ComplianceHub() {
   const { data: sapsLogs, isLoading } = useQuery({
     queryKey: ['saps-607'],

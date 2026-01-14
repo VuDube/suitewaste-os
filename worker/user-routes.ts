@@ -74,7 +74,83 @@ export function userRoutes(app: HonoApp) {
     if (!user || !roles.includes(user.role)) throw forbidden();
     await next();
   };
-  // --- OPS & SHIFTS ---
+  // --- SYNC ENGINE ---
+  app.post('/api/sync/ledger', async (c) => {
+    const { pendingEntries } = await c.req.json<{ pendingEntries: InventoryLedgerEntry[] }>();
+    for (const entry of pendingEntries) {
+      await InventoryLedgerEntity.create(c.env, { ...entry, is_synced: true });
+    }
+    return ok(c, { syncedIds: pendingEntries.map(e => e.id) });
+  });
+  app.post('/api/sync/transactions', async (c) => {
+    const { pendingTransactions } = await c.req.json<{ pendingTransactions: Transaction[] }>();
+    for (const t of pendingTransactions) {
+      await TransactionEntity.create(c.env, { ...t, is_synced: true });
+    }
+    return ok(c, { syncedIds: pendingTransactions.map(t => t.id) });
+  });
+  // --- LOGISTICS ---
+  app.get('/api/fleet/vehicles', async (c) => {
+    const res = await VehicleEntity.list(c.env, null, 100);
+    return ok(c, res?.items || []);
+  });
+  app.get('/api/fleet/routes', async (c) => {
+    const res = await RouteEntity.list(c.env, null, 100);
+    return ok(c, res?.items || []);
+  });
+  app.post('/api/fleet/routes/:id/dispatch', requireRole(['manager', 'admin']), async (c) => {
+    const id = c.req.param('id');
+    const route = new RouteEntity(c.env, id);
+    await route.patch({ status: 'in-progress' });
+    return ok(c, { id, status: 'in-progress' });
+  });
+  // --- MARKETPLACE & PRODUCERS ---
+  app.get('/api/marketplace/lots', async (c) => {
+    // Simulated market lots derived from large ledger entries
+    const ledger = await InventoryLedgerEntity.list(c.env, null, 10);
+    const lots = (ledger?.items || []).filter(e => e.weight_kg > 50).map(e => ({
+      id: `lot-${e.id}`,
+      material: e.material_type,
+      weight_kg: e.weight_kg,
+      purity: '99.9%',
+      epr_status: 'Certified'
+    }));
+    return ok(c, lots);
+  });
+  app.get('/api/producers/requests', async (c) => {
+    const res = await ProducerRequestEntity.list(c.env, null, 100);
+    return ok(c, res?.items || []);
+  });
+  // --- COMPLIANCE & AUDIT ---
+  app.get('/api/audit', requireRole(['admin', 'auditor']), async (c) => {
+    const cursor = c.req.query('cursor');
+    const res = await AuditLogEntity.list(c.env, cursor, 50);
+    return ok(c, res);
+  });
+  app.post('/api/audit/verify', requireRole(['admin', 'auditor']), async (c) => {
+    const res = await AuditLogEntity.list(c.env, null, 1000);
+    const verification = await AuditLogEntity.verifyChain(res.items);
+    return ok(c, verification);
+  });
+  app.get('/api/epr-report', requireRole(['admin', 'auditor']), async (c) => {
+    const transactions = await TransactionEntity.list(c.env, null, 1000);
+    const totalFees = (transactions?.items || []).reduce((s, t) => s + (t.epr_fee || 0), 0);
+    return ok(c, { total_fees: totalFees, compliance_pct: 94 });
+  });
+  // --- DATA GOVERNANCE ---
+  app.get('/api/auth/export', async (c) => {
+    const user = c.get('user');
+    const audit = await AuditLogEntity.list(c.env, null, 100);
+    const userLogs = (audit?.items || []).filter(l => l.actor_id === user?.id);
+    return ok(c, { profile: user, history: userLogs });
+  });
+  app.post('/api/auth/purge', async (c) => {
+    const user = c.get('user');
+    if (!user) throw unauthorized();
+    await UserEntity.delete(c.env, user.id);
+    return ok(c, { purged: true });
+  });
+  // --- HARDWARE ---
   app.post('/api/ops/shifts', requireRole(['operator', 'manager', 'admin']), async (c) => {
     const { status } = await c.req.json();
     const user = c.get('user');
@@ -99,14 +175,7 @@ export function userRoutes(app: HonoApp) {
     });
     return ok(c, { verified: true });
   });
-  // --- FINANCE & VAT264 ---
-  app.get('/api/finance/vat264', requireRole(['manager', 'admin', 'auditor']), async (c) => {
-    const transactions = await TransactionEntity.list(c.env, null, 1000);
-    // Filter transactions for non-VAT suppliers (mock logic)
-    const logs = (transactions?.items || []).filter(t => t.amount > 5000);
-    return ok(c, logs);
-  });
-  // --- AUTH SEEDING ---
+  // --- AUTH SEEDING & LOGIN ---
   app.get('/api/auth/init', async (c) => {
     await Promise.all([
       UserEntity.ensureSeed(c.env),
@@ -134,7 +203,7 @@ export function userRoutes(app: HonoApp) {
     const { password_hash, ...safeUser } = user;
     return ok(c, safeUser);
   });
-  // --- STANDARD ENTITIES ---
+  // --- CORE ENTITIES ---
   app.get('/api/suppliers', async (c) => {
     const result = await SupplierEntity.list(c.env, null, 1000);
     return ok(c, result?.items || []);
@@ -159,7 +228,6 @@ export function userRoutes(app: HonoApp) {
     ]);
     const ledgerItems = ledger?.items || [];
     const transactionsItems = transactions?.items || [];
-    // Summary aggregation
     const totalWeight = ledgerItems.reduce((s, i) => s + (i.weight_kg || 0), 0);
     const totalValue = transactionsItems.reduce((s, i) => s + (i.amount || 0), 0);
     const totalEPR = transactionsItems.reduce((s, i) => s + (i.epr_fee || 0), 0);
@@ -188,10 +256,6 @@ export function userRoutes(app: HonoApp) {
     const result = await SapsRecordEntity.list(c.env, null, 100);
     return ok(c, result?.items || []);
   });
-  app.get('/api/finance/gl-summary', async (c) => {
-    const accounts = await GLAccountEntity.list(c.env, null, 100);
-    return ok(c, accounts?.items || []);
-  });
   app.get('/api/finance/vat-report', async (c) => {
     const transactions = await TransactionEntity.list(c.env, null, 1000);
     const items = transactions?.items || [];
@@ -199,5 +263,10 @@ export function userRoutes(app: HonoApp) {
     const netAmount = totalGross / 1.15;
     const vatAmount = totalGross - netAmount;
     return ok(c, { net_amount: netAmount, vat_amount: vatAmount, gross_amount: totalGross });
+  });
+  app.get('/api/finance/vat264', requireRole(['manager', 'admin', 'auditor']), async (c) => {
+    const transactions = await TransactionEntity.list(c.env, null, 1000);
+    const logs = (transactions?.items || []).filter(t => t.amount > 5000);
+    return ok(c, logs);
   });
 }

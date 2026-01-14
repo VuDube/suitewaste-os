@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from "@/lib/utils";
 export function OperationsHub() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,7 +53,7 @@ export function OperationsHub() {
             </div>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <Button 
+            <Button
               onClick={() => shiftMutation.mutate(isShiftActive ? 'end' : 'start')}
               variant={isShiftActive ? "destructive" : "default"}
               className="h-14 font-black uppercase tracking-widest px-8 shadow-lg"
