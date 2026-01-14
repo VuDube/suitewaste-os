@@ -10,6 +10,20 @@ export type WasteStreamType =
   | 'Metals'
   | 'Electrical & Electronic'
   | 'Other';
+export interface EcoRewards {
+  id: string;
+  supplier_id: string;
+  points_balance: number;
+  token_address?: string;
+  last_award_date: number;
+}
+export interface AIClassificationResult {
+  material_type: string;
+  confidence: number;
+  grade_suggestion: string;
+  reasoning: string;
+  suggested_price_zar?: number;
+}
 export interface User {
   id: string;
   username: string;
@@ -34,6 +48,8 @@ export interface Supplier {
   address?: string;
   epr_number?: string;
   is_weee_compliant: boolean;
+  total_rewards?: number;
+  last_saps_verification?: number;
   created_at: number;
   updated_at: number;
 }

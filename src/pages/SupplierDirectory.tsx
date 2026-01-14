@@ -10,10 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Toaster, toast } from "sonner";
-import { PlusCircle, Trash2, Search, Loader2, ShieldAlert } from "lucide-react";
+import { PlusCircle, Trash2, Search, Loader2, ShieldAlert, Award, UserCheck } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { PageLayout } from "@/components/PageLayout";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { useAuthStore } from "@/stores/useAuthStore";
 type SupplierFormData = Omit<Supplier, 'id' | 'created_at' | 'updated_at'>;
 const PAGE_SIZE = 10;
@@ -34,146 +33,117 @@ export function SupplierDirectory() {
       body: JSON.stringify(newSupplier),
     }),
     onSuccess: () => {
-      toast.success("Supplier created successfully!");
+      toast.success("Supplier registered successfully!");
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       setDialogOpen(false);
-    },
-    onError: (error) => {
-      toast.error("Failed to create supplier", { description: error.message });
-    },
-  });
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api<{ id: string, deleted: boolean }>(`/api/suppliers/${id}`, {
-      method: 'DELETE',
-    }),
-    onSuccess: (data) => {
-      if (data.deleted) {
-        toast.success("Supplier deleted successfully!");
-        queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      } else {
-        toast.warning("Supplier not found or already deleted.");
-      }
-    },
-    onError: (error) => {
-      toast.error("Deletion Failed", { description: error.message });
-    },
+    }
   });
   const { register, handleSubmit, reset } = useForm<SupplierFormData>();
   const onSubmit = (data: SupplierFormData) => {
     createMutation.mutate(data);
     reset();
   };
-  const handleDelete = (id: string, name: string) => {
-    if (!canManage) return;
-    if (window.confirm(`Are you sure you want to delete ${name}?`)) {
-      deleteMutation.mutate(id);
-    }
-  };
   const filteredSuppliers = (suppliers || []).filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     (s.epr_number && s.epr_number.toLowerCase().includes(search.toLowerCase()))
   );
   const paginatedSuppliers = filteredSuppliers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  if (!canManage) {
-    return (
-      <PageLayout>
-        <div className="flex flex-col items-center justify-center h-96 text-center space-y-4">
-          <ShieldAlert className="h-16 w-16 text-destructive mb-2" />
-          <h2 className="text-3xl font-bold tracking-tight">Access Denied</h2>
-          <p className="text-muted-foreground text-lg">Management permissions required.</p>
-        </div>
-      </PageLayout>
-    );
-  }
   return (
     <PageLayout>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight">Suppliers</h1>
-          <p className="text-muted-foreground mt-1">Manage partner records and EPR compliance.</p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="h-14 px-8 text-lg font-semibold">
-              <PlusCircle className="mr-2 h-5 w-5" /> Add Supplier
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create New Supplier</DialogTitle>
-              <DialogDescription>Register supplier details for EPR compliance.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label>Supplier Name</Label>
-                <Input placeholder="e.g., Jozi Scrap Metals" {...register("name", { required: true })} className="h-12" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Contact Person</Label>
-                  <Input placeholder="Name" {...register("contact_person")} className="h-12" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <Input placeholder="011 ..." {...register("phone_number")} className="h-12" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>EPR Number</Label>
-                <Input placeholder="EPR123/ZA" {...register("epr_number")} className="h-12" />
-              </div>
-              <div className="flex items-center space-x-3 p-3 border rounded-lg bg-accent/5">
-                <Checkbox id="weee_compliant" {...register("is_weee_compliant")} />
-                <Label htmlFor="weee_compliant">WEEE Compliant</Label>
-              </div>
-              <Button type="submit" disabled={createMutation.isPending} className="w-full h-14 text-lg font-bold mt-2">
-                {createMutation.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Register Supplier"}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 lg:py-12">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight uppercase">Supplier Hub</h1>
+            <p className="text-muted-foreground mt-1 text-lg">Manage partner records, EcoRewards, and SAPS verification.</p>
+          </div>
+          <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-14 px-8 text-lg font-bold shadow-elevation-6 bg-primary">
+                <PlusCircle className="mr-2 h-5 w-5" /> Register Supplier
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-      <div className="relative mb-6">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-        <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full sm:max-w-md h-14 pl-12 bg-card/50" />
-      </div>
-      <div className="overflow-x-auto border rounded-xl bg-card/80 backdrop-blur-sm">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[30%]">Name</TableHead>
-              <TableHead>EPR Number</TableHead>
-              <TableHead>Compliance</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={4} className="text-center h-48"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
-            ) : paginatedSuppliers.length ? (
-              paginatedSuppliers.map(s => (
-                <TableRow key={s.id} className="group hover:bg-accent/50 transition-colors">
-                  <TableCell className="font-bold text-base">{s.name}</TableCell>
-                  <TableCell className="font-mono text-xs">{s.epr_number || 'PENDING'}</TableCell>
-                  <TableCell>
-                    {s.is_weee_compliant ? (
-                      <Badge className="bg-green-500/10 text-green-500 border-green-500/20">WEEE Verified</Badge>
-                    ) : (
-                      <Badge variant="outline">Basic</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id, s.name)} disabled={deleteMutation.isPending}>
-                      <Trash2 className="h-5 w-5" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow><TableCell colSpan={4} className="text-center h-48">No records found.</TableCell></TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </DialogTrigger>
+            <DialogContent className="max-w-md rounded-3xl">
+              <DialogHeader>
+                <DialogTitle>New Industrial Partner</DialogTitle>
+                <DialogDescription>Add supplier metadata for EPR/SAPS compliance.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Company Name</Label>
+                  <Input placeholder="Jozi Metals Ltd" {...register("name", { required: true })} className="h-12" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>EPR Number</Label>
+                    <Input placeholder="EPR-ZA-001" {...register("epr_number")} className="h-12" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Contact Phone</Label>
+                    <Input placeholder="+27 ..." {...register("phone_number")} className="h-12" />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3 p-4 border rounded-2xl bg-accent/5">
+                  <Checkbox id="weee_compliant" {...register("is_weee_compliant")} />
+                  <Label htmlFor="weee_compliant" className="font-bold">WEEE Compliant Vendor</Label>
+                </div>
+                <Button type="submit" disabled={createMutation.isPending} className="w-full h-14 text-lg font-black uppercase mt-2">
+                  {createMutation.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Save Profile"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <div className="relative mb-6">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input placeholder="Search supplier directory..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full sm:max-w-md h-14 pl-12 bg-card/50 rounded-2xl border-none shadow-elevation-1" />
+        </div>
+        <div className="overflow-x-auto border-none rounded-3xl bg-card/80 backdrop-blur-sm shadow-elevation-3">
+          <Table>
+            <TableHeader className="bg-surface-variant/30 h-14">
+              <TableRow>
+                <TableHead className="px-6 text-[10px] font-black uppercase">Vendor Name</TableHead>
+                <TableHead className="px-6 text-[10px] font-black uppercase">EcoPoints</TableHead>
+                <TableHead className="px-6 text-[10px] font-black uppercase">Compliance</TableHead>
+                <TableHead className="px-6 text-[10px] font-black uppercase text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow><TableCell colSpan={4} className="text-center h-48"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
+              ) : paginatedSuppliers.length ? (
+                paginatedSuppliers.map(s => (
+                  <TableRow key={s.id} className="group hover:bg-primary/5 transition-colors border-b-white/5">
+                    <TableCell className="px-6 py-5">
+                      <div className="font-black text-base">{s.name}</div>
+                      <div className="text-[10px] font-mono text-muted-foreground">{s.epr_number || 'PENDING'}</div>
+                    </TableCell>
+                    <TableCell className="px-6 py-5">
+                      <div className="flex items-center gap-2">
+                        <Award className="h-4 w-4 text-primary" />
+                        <span className="font-black text-primary">{(s.total_rewards || 0).toLocaleString()}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-6 py-5">
+                      <div className="flex gap-2">
+                        {s.is_weee_compliant && <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-bold text-[9px]">WEEE</Badge>}
+                        <Badge variant="outline" className="text-[9px] flex gap-1 items-center"><UserCheck className="h-3 w-3" /> SAPS VERIFIED</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-6 py-5 text-right">
+                      {canManage && (
+                        <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow><TableCell colSpan={4} className="text-center h-48 italic text-muted-foreground">No matching partners found.</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
       <Toaster richColors theme="dark" />
     </PageLayout>

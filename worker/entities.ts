@@ -2,17 +2,38 @@ import { IndexedEntity, type Env } from "./core-utils";
 import type {
   Supplier, InventoryLedgerEntry, Transaction, User, Session, AuditLog,
   StaffMember, GLAccount, GLEntry, Vehicle, CollectionRoute,
-  MarketplaceOrder, ProducerDisposalRequest, Timesheet
+  MarketplaceOrder, ProducerDisposalRequest, Timesheet, EcoRewards
 } from "@shared/types";
-
 // New Enterprise Types (Inlined for worker context)
 export interface SapsRecord { id: string; transaction_id: string; supplier_id: string; status: string; created_at: number; }
 export interface Bid { id: string; lot_id: string; buyer_id: string; amount_zar: number; status: string; timestamp: number; }
 export interface ObdLog { id: string; vehicle_id: string; timestamp: number; fuel_level: number; dtc_codes: string; }
 export interface PayrollRecord { id: string; staff_id: string; net_pay: number; payment_status: string; period_end: number; }
 export interface ChatMessage { id: string; channel_id: string; sender_id: string; encrypted_payload: string; timestamp: number; }
-
 import { MOCK_SUPPLIERS, MOCK_INVENTORY_LEDGER, MOCK_TRANSACTIONS, MOCK_USERS } from "@shared/mock-data";
+export class EcoRewardEntity extends IndexedEntity<EcoRewards> {
+  static readonly entityName = "eco_reward";
+  static readonly indexName = "eco_rewards";
+  static readonly initialState: EcoRewards = { id: "", supplier_id: "", points_balance: 0, last_award_date: 0 };
+  /**
+   * Transactionally award points to a supplier.
+   */
+  static async awardPoints(env: Env, supplierId: string, weight: number, material: string): Promise<number> {
+    const inst = new EcoRewardEntity(env, supplierId);
+    const multiplier = material.toLowerCase().includes('copper') ? 5 : 1;
+    const earned = Math.floor(weight * multiplier);
+    const updated = await inst.mutate(s => ({
+      ...s,
+      supplier_id: supplierId,
+      points_balance: s.points_balance + earned,
+      last_award_date: Date.now()
+    }));
+    // Ensure index entry exists
+    const idx = new (require("./core-utils").Index)(env, this.indexName);
+    await idx.add(supplierId);
+    return updated.points_balance;
+  }
+}
 export class SessionEntity extends IndexedEntity<Session> {
   static readonly entityName = "session";
   static readonly indexName = "sessions";
@@ -124,9 +145,6 @@ export class AuditLogEntity extends IndexedEntity<AuditLog> {
     payload_hash: "0",
     previous_hash: "0"
   };
-  /**
-   * Records a new audit log entry with SHA-256 chaining.
-   */
   static async record(
     env: Env,
     data: Omit<AuditLog, "id" | "timestamp" | "payload_hash" | "previous_hash">
@@ -134,7 +152,6 @@ export class AuditLogEntity extends IndexedEntity<AuditLog> {
     const prevHash = await this.getLatestHash(env);
     const id = crypto.randomUUID();
     const timestamp = Date.now();
-    // Simple mock hash for runtime (in production use crypto.subtle.digest)
     const payloadStr = JSON.stringify({ ...data, id, timestamp, prevHash });
     const payloadHash = btoa(payloadStr).substring(0, 64);
     const log: AuditLog = {
@@ -148,18 +165,15 @@ export class AuditLogEntity extends IndexedEntity<AuditLog> {
     return log;
   }
   static async getLatestHash(env: Env): Promise<string> {
-    const logs = await this.list(env, null, 100);
-    const sorted = (logs.items || []).sort((a, b) => b.timestamp - a.timestamp);
-    return sorted[0]?.payload_hash || "0000000000000000000000000000000000000000000000000000000000000000";
+    const logs = await this.list(env, null, 1);
+    return logs.items[0]?.payload_hash || "0000000000000000000000000000000000000000000000000000000000000000";
   }
   static async verifyChain(items: AuditLog[]): Promise<{ verified: boolean; totalChecked: number; reason?: string; blockId?: string }> {
     if (items.length === 0) return { verified: true, totalChecked: 0 };
     const sorted = [...items].sort((a, b) => a.timestamp - b.timestamp);
     let prevHash = sorted[0].previous_hash;
     for (const log of sorted) {
-      if (log.previous_hash !== prevHash) {
-        return { verified: false, totalChecked: sorted.indexOf(log), reason: "Hash linkage failure", blockId: log.id };
-      }
+      if (log.previous_hash !== prevHash) return { verified: false, totalChecked: sorted.indexOf(log), reason: "Hash linkage failure", blockId: log.id };
       prevHash = log.payload_hash;
     }
     return { verified: true, totalChecked: sorted.length };

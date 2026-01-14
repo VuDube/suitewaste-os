@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
+import type { AIClassificationResult } from '@shared/types';
 export function useAI_Wingman() {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -10,9 +11,21 @@ export function useAI_Wingman() {
     setIsSpeaking(true);
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 0.9;
-    utterance.pitch = 1.0;
     utterance.onend = () => setIsSpeaking(false);
     window.speechSynthesis.speak(utterance);
+  }, []);
+  const classifyMaterial = useCallback(async (weight: number, context?: string): Promise<AIClassificationResult | null> => {
+    return toast.promise(
+      api<AIClassificationResult>('/api/ai/classify', {
+        method: 'POST',
+        body: JSON.stringify({ weight, context })
+      }),
+      {
+        loading: 'AI analyzing material stream...',
+        success: (res) => `Identified as ${res.material_type} (${Math.floor(res.confidence * 100)}%)`,
+        error: 'Classification failed'
+      }
+    );
   }, []);
   const processIntent = useCallback(async (text: string) => {
     try {
@@ -23,20 +36,17 @@ export function useAI_Wingman() {
       speak(res.response);
       return res.response;
     } catch (e) {
-      toast.error("Wingman NLP Error");
       return null;
     }
   }, [speak]);
   const listen = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      toast.error("Speech Recognition not supported in this browser.");
+      toast.error("Speech Recognition not supported");
       return;
     }
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-ZA';
-    recognition.continuous = false;
-    recognition.interimResults = false;
     recognition.onstart = () => setIsListening(true);
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
@@ -47,5 +57,5 @@ export function useAI_Wingman() {
     recognition.start();
     recognitionRef.current = recognition;
   }, [processIntent]);
-  return { isListening, isSpeaking, listen, speak };
+  return { isListening, isSpeaking, listen, speak, classifyMaterial };
 }
