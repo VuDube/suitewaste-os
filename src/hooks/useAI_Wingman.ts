@@ -15,17 +15,20 @@ export function useAI_Wingman() {
     window.speechSynthesis.speak(utterance);
   }, []);
   const classifyMaterial = useCallback(async (weight: number, context?: string): Promise<AIClassificationResult | null> => {
-    return toast.promise(
-      api<AIClassificationResult>('/api/ai/classify', {
-        method: 'POST',
-        body: JSON.stringify({ weight, context })
-      }),
-      {
-        loading: 'AI analyzing material stream...',
-        success: (res) => `Identified as ${res.material_type} (${Math.floor(res.confidence * 100)}%)`,
-        error: 'Classification failed'
-      }
-    );
+    const classificationPromise = api<AIClassificationResult>('/api/ai/classify', {
+      method: 'POST',
+      body: JSON.stringify({ weight, context })
+    });
+    toast.promise(classificationPromise, {
+      loading: 'AI analyzing material stream...',
+      success: (res) => `Identified as ${res.material_type} (${Math.floor(res.confidence * 100)}%)`,
+      error: 'Classification failed'
+    });
+    try {
+      return await classificationPromise;
+    } catch (e) {
+      return null;
+    }
   }, []);
   const processIntent = useCallback(async (text: string) => {
     try {

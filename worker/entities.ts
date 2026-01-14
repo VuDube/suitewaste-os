@@ -1,4 +1,4 @@
-import { IndexedEntity, type Env } from "./core-utils";
+import { IndexedEntity, type Env, Index } from "./core-utils";
 import type {
   Supplier, InventoryLedgerEntry, Transaction, User, Session, AuditLog,
   StaffMember, GLAccount, GLEntry, Vehicle, CollectionRoute,
@@ -28,8 +28,8 @@ export class EcoRewardEntity extends IndexedEntity<EcoRewards> {
       points_balance: s.points_balance + earned,
       last_award_date: Date.now()
     }));
-    // Ensure index entry exists
-    const idx = new (require("./core-utils").Index)(env, this.indexName);
+    // Ensure index entry exists using the imported Index class
+    const idx = new Index<string>(env, this.indexName);
     await idx.add(supplierId);
     return updated.points_balance;
   }

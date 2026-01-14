@@ -60,19 +60,22 @@ const WeightDisplay = memo(({ weight, status }: { weight: number, status: string
 ));
 export function QuickWeightPOS() {
   const { user } = useAuth();
-  const { weight, status, connect, devices } = useMultiScale();
+  const weight = useMultiScale(s => s.weight);
+  const status = useMultiScale(s => s.status);
+  const connect = useMultiScale(s => s.connect);
   const { connect: connectPrinter } = usePrinter();
   const { getPriceForMaterial } = useLME();
   const { classifyMaterial } = useAI_Wingman();
-  const [manualWeight, setManualWeight] = useState(0.0);
   const addLedgerEntry = useOfflineStore(s => s.addLedgerEntry);
   const addTransaction = useOfflineStore(s => s.addTransaction);
-  const totalPending = useOfflineStore(s => s.pendingLedgerEntries.length + s.pendingTransactions.length);
+  const pendingLedgerEntries = useOfflineStore(s => s.pendingLedgerEntries);
+  const pendingTransactions = useOfflineStore(s => s.pendingTransactions);
+  const totalPending = pendingLedgerEntries.length + pendingTransactions.length;
   const [supplierId, setSupplierId] = useState<string>('');
   const [materialType, setMaterialType] = useState("");
   const [amount, setAmount] = useState("");
   const [isAiSuggested, setIsAiSuggested] = useState(false);
-  const effectiveWeight = (status === 'connected' || status === 'parsing') ? weight : manualWeight;
+  const effectiveWeight = (status === 'connected' || status === 'parsing') ? weight : 0;
   const marketPrice = useMemo(() => getPriceForMaterial(materialType), [materialType, getPriceForMaterial]);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useQuery({
     queryKey: ['suppliers'],
@@ -96,11 +99,12 @@ export function QuickWeightPOS() {
       toast.error("Incomplete Capture Data");
       return;
     }
+    // Correctly call the fixed addLedgerEntry with required fields
     const ledgerEntryId = addLedgerEntry({
       supplier_id: supplierId,
       material_type: materialType,
       weight_kg: effectiveWeight,
-      operator_id: user?.id,
+      operator_id: user?.id || 'unknown-op',
       device_id: status === 'disconnected' ? 'manual-keypad' : 'main-scale',
     });
     addTransaction({
@@ -119,7 +123,7 @@ export function QuickWeightPOS() {
         <div className="flex flex-col space-y-8 animate-fade-in max-w-5xl mx-auto pb-32">
           <section className="relative overflow-hidden rounded-3xl bg-surface-container/50 border border-white/5 p-8 flex flex-col items-center justify-center shadow-elevation-3">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent pointer-events-none" />
-            <WeightDisplay weight={effectiveWeight} status={status === 'disconnected' ? 'manual' : status} />
+            <WeightDisplay weight={effectiveWeight} status={status} />
             <div className="grid grid-cols-2 gap-4 w-full max-w-lg mt-4">
               <Button size="lg" variant="secondary" className="h-16 rounded-2xl font-bold touch-haptic" onClick={connect} disabled={status === 'connected'}>
                 <Cable className="mr-2 h-6 w-6" /> Link Scale
