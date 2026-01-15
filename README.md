@@ -2,7 +2,7 @@
 
 SuiteWaste OS is a dark-mode-first, offline-first Progressive Web App (PWA) designed for waste collection points and scrap-buyers in South Africa. Built entirely on the Cloudflare serverless stack (Workers, D1, R2, Workers AI), it provides a robust Quick-Weight POS for fast local weighing, an audit-grade inventory ledger, and a transaction engine that embeds South African EPR/WEEE compliance metadata. The app ensures reliability during load-shedding and poor connectivity through Service Workers and TanStack Query for offline synchronization. Hardware integration is hardware-agnostic via modern Web APIs like Web Serial for scales and IP cameras.
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/VuDube/suitewaste-os)
 
 ## Key Features
 
@@ -159,7 +159,7 @@ Deploy to Cloudflare Workers for global edge execution. The app is pre-configure
 
 For one-click deployment:
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/VuDube/suitewaste-os)
 
 ### Production Considerations
 - **Secrets**: Use `wrangler secret put` for camera credentials and API keys.
