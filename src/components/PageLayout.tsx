@@ -11,6 +11,11 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from './ThemeToggle';
 import { cn } from '@/lib/utils';
+export const LeafLogo = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={cn("fill-current", className)} xmlns="http://www.w3.org/2000/svg">
+    <path d="M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L6.66,19.7C7.14,19.87 7.64,20 8,20C19,20 22,3 22,3C21,5 14,5.25 9,6.25C4,7.25 2,11.5 2,13.5C2,15.5 3.75,17.25 3.75,17.25C7,11 17,8 17,8Z" />
+  </svg>
+);
 type PageLayoutProps = {
   children: React.ReactNode;
   fullBleed?: boolean;
@@ -20,17 +25,19 @@ export function PageLayout({ children, fullBleed = false }: PageLayoutProps) {
   const navigate = useNavigate();
   const logoutAction = useAuthStore(s => s.logout);
   const queryClient = useQueryClient();
-
   const handleLogout = () => {
     logoutAction();
     queryClient.clear();
-    toast.success('Industrial session terminated.');
+    toast.success('Secure session terminated.');
     navigate('/login', { replace: true });
   };
   if (isLoading) {
     return (
-      <div className="h-dvh w-full flex items-center justify-center bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <div className="h-dvh w-full flex flex-col items-center justify-center bg-[#1a3620] overflow-hidden">
+        <LeafLogo className="h-16 w-16 text-leaf animate-pulse-slow mb-8" />
+        <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden relative">
+          <div className="absolute inset-0 bg-leaf animate-load" />
+        </div>
       </div>
     );
   }
@@ -39,50 +46,45 @@ export function PageLayout({ children, fullBleed = false }: PageLayoutProps) {
   }
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
+      <div className="flex h-dvh w-full overflow-hidden bg-[#1a3620] relative text-foreground">
+        {/* Global Background Layers */}
+        <div className="fixed inset-0 industrial-grid z-0" />
+        <div className="fixed inset-0 scanline-overlay z-0" />
         <AppSidebar />
-        <SidebarInset className="flex flex-col flex-1 relative min-w-0 bg-background overflow-hidden">
-          {/* Header Safe Area Spacer */}
-          <div className="h-[env(safe-area-inset-top)] bg-background/95 shrink-0 z-50 md:hidden" />
-          {/* Mobile Top Header (Minimal) */}
-          <header className="md:hidden h-14 flex items-center justify-between px-4 border-b border-white/5 bg-background/80 backdrop-blur-xl shrink-0 z-40">
-            <SidebarTrigger className="h-10 w-10 rounded-xl hover:bg-surface-variant/50">
+        <SidebarInset className="flex flex-col flex-1 relative min-w-0 bg-transparent overflow-hidden z-10">
+          <header className="md:hidden h-16 flex items-center justify-between px-4 glass-panel border-b border-white/10 shrink-0 z-40">
+            <SidebarTrigger className="h-10 w-10 rounded-xl hover:bg-white/10">
               <Menu className="h-5 w-5" />
             </SidebarTrigger>
-            <div className="flex-1 flex justify-center">
-              <span className="text-xs font-black uppercase tracking-widest text-center">SuiteWaste OS</span>
+            <div className="flex items-center gap-2">
+              <LeafLogo className="h-6 w-6 text-leaf" />
+              <span className="text-xs font-black uppercase tracking-widest text-white">SuiteWaste</span>
             </div>
             <div className="flex items-center gap-2">
-              <ThemeToggle className="h-10 w-10 hover:scale-105 transition-transform z-50" />
-              <Button 
-                variant="destructive" 
-                size="sm" 
-                onClick={handleLogout} 
-                className="h-10 px-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-2xl border-2 border-destructive hover:border-destructive/80 bg-destructive/95 hover:bg-destructive active:scale-95 transition-all ml-auto"
+              <ThemeToggle className="h-10 w-10 relative z-50" />
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleLogout}
+                className="h-10 px-4 rounded-xl font-black uppercase tracking-widest text-[10px] bg-[#2E5A35] hover:bg-[#2E5A35]/80 border-none"
               >
-                <LogOut className="h-4 w-4 mr-1" />
                 LOGOUT
               </Button>
             </div>
           </header>
-          {/* Main Scrollable Content */}
-          <main className="flex-1 overflow-y-auto scrollbar-hide relative z-0">
+          <main className="flex-1 overflow-y-auto scrollbar-hide relative">
             <div className={cn(
-              "mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10",
+              "mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 lg:py-12",
               !fullBleed && "max-w-7xl",
-              "pb-[max(100px,env(safe-area-inset-bottom))]" // Ensure bottom nav clearance
+              "pb-[max(120px,env(safe-area-inset-bottom))]"
             )}>
               {children}
             </div>
           </main>
-          {/* Bottom Bar for Mobile */}
           <GlobalNav />
-          {/* Footer Safe Area Spacer */}
-          <div className="h-[env(safe-area-inset-bottom)] bg-background/95 shrink-0 z-40 md:hidden" />
         </SidebarInset>
       </div>
-      {/* Fixed Desktop ThemeToggle */}
-      <ThemeToggle className="fixed top-5 right-5 z-[99] hidden md:flex h-12 w-12 shadow-xl pointer-events-auto" />
+      <ThemeToggle className="fixed top-5 right-5 z-[99] hidden md:flex h-12 w-12 shadow-elevation-12" />
     </SidebarProvider>
   );
 }

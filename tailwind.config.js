@@ -20,8 +20,12 @@ export default {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			primary: {
-  				DEFAULT: 'hsl(var(--primary))',
-  				foreground: 'hsl(var(--primary-foreground))'
+  				DEFAULT: '#2E5A35',
+  				foreground: '#FFFFFF'
+  			},
+  			leaf: {
+  				DEFAULT: '#4CAF50',
+  				foreground: '#FFFFFF'
   			},
   			surface: {
   				container: 'hsl(var(--surface-container))',
@@ -41,9 +45,10 @@ export default {
   		},
   		boxShadow: {
   			'elevation-1': '0 1px 3px rgba(0,0,0,0.12)',
-  			'elevation-4': '0 4px 10px rgba(56, 118, 29, 0.15)',
-  			'elevation-12': '0 12px 24px rgba(56, 118, 29, 0.25)',
-  			glow: '0 0 20px -5px hsl(var(--primary) / 0.4)'
+  			'elevation-4': '0 4px 10px rgba(46, 90, 53, 0.15)',
+  			'elevation-12': '0 12px 24px rgba(46, 90, 53, 0.25)',
+  			'leaf-glow': '0 0 20px -5px #4CAF50',
+  			glow: '0 0 20px -5px #2E5A35'
   		},
   		transitionTimingFunction: {
   			'm3-standard': 'cubic-bezier(0.2, 0, 0, 1)'
@@ -51,7 +56,8 @@ export default {
   		animation: {
   			'fade-in': 'fade-in 0.4s cubic-bezier(0.2, 0, 0, 1)',
   			'scale-in': 'scale-in 0.3s cubic-bezier(0.2, 0, 0, 1)',
-  			pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+  			'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+  			'load': 'load 2s cubic-bezier(0.2, 0, 0, 1) infinite'
   		},
   		keyframes: {
   			'fade-in': {
@@ -61,6 +67,10 @@ export default {
   			'scale-in': {
   				'0%': { opacity: '0', transform: 'scale(0.95)' },
   				'100%': { opacity: '1', transform: 'scale(1)' }
+  			},
+  			'load': {
+  				'0%': { transform: 'translateX(-100%)' },
+  				'100%': { transform: 'translateX(100%)' }
   			}
   		}
   	}
