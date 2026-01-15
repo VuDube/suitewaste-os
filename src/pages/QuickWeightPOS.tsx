@@ -20,7 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/PageLayout";
 import { motion, AnimatePresence } from "framer-motion";
-const WeightDisplay = memo(({ weight, status }: { weight: number, status: string }) => (
+const WeightDisplay = memo(({ weight, status }: { weight: number; status: string }) => (
   <div className="flex flex-col items-center justify-center py-12">
     <div className="relative">
       <motion.span
@@ -29,7 +29,7 @@ const WeightDisplay = memo(({ weight, status }: { weight: number, status: string
         animate={{ opacity: 1, scale: 1 }}
         className={cn(
           "text-weight-clamp block leading-none transition-colors",
-          (status === 'connected' || status === 'parsing' || status === 'manual')
+          (typeof status === 'string' && (status === 'connected' || status === 'parsing' || status === 'manual'))
             ? "bg-gradient-to-b from-primary to-primary/60 bg-clip-text text-transparent"
             : "text-muted-foreground/20"
         )}
@@ -39,16 +39,23 @@ const WeightDisplay = memo(({ weight, status }: { weight: number, status: string
       <span className="absolute -bottom-2 -right-12 text-2xl font-black text-muted-foreground uppercase tracking-widest">kg</span>
     </div>
     <Badge variant="outline" className="mt-4 gap-2 px-4 py-1.5 font-black uppercase tracking-widest">
-      {status === 'manual' ? (
-        <>
-          <ShieldAlert className="h-3 w-3 text-amber-500" />
-          <span className="text-amber-500 font-black uppercase">Manual Entry</span>
-        </>
-      ) : (status === 'connected' || status === 'parsing') ? (
-        <>
-          <Activity className="h-3 w-3 text-emerald-500 animate-pulse" />
-          <span className="text-emerald-500">Live Scale Stream</span>
-        </>
+      {typeof status === 'string' ? (
+        status === 'manual' ? (
+          <>
+            <ShieldAlert className="h-3 w-3 text-amber-500" />
+            <span className="text-amber-500 font-black uppercase">Manual Entry</span>
+          </>
+        ) : (status === 'connected' || status === 'parsing') ? (
+          <>
+            <Activity className="h-3 w-3 text-emerald-500 animate-pulse" />
+            <span className="text-emerald-500">Live Scale Stream</span>
+          </>
+        ) : (
+          <>
+            <XCircle className="h-3 w-3 text-destructive" />
+            <span className="text-destructive">Scale Disconnected</span>
+          </>
+        )
       ) : (
         <>
           <XCircle className="h-3 w-3 text-destructive" />
@@ -60,9 +67,7 @@ const WeightDisplay = memo(({ weight, status }: { weight: number, status: string
 ));
 export function QuickWeightPOS() {
   const { user } = useAuth();
-  const weight = useMultiScale(s => s.weight);
-  const status = useMultiScale(s => s.status);
-  const connect = useMultiScale(s => s.connect);
+  const { weight, status, connect } = useMultiScale();
   const { connect: connectPrinter } = usePrinter();
   const { getPriceForMaterial } = useLME();
   const { classifyMaterial } = useAI_Wingman();
@@ -75,7 +80,7 @@ export function QuickWeightPOS() {
   const [materialType, setMaterialType] = useState("");
   const [amount, setAmount] = useState("");
   const [isAiSuggested, setIsAiSuggested] = useState(false);
-  const effectiveWeight = (status === 'connected' || status === 'parsing') ? weight : 0;
+  const effectiveWeight = (typeof status === 'string' && (status === 'connected' || status === 'parsing')) ? weight : 0;
   const marketPrice = useMemo(() => getPriceForMaterial(materialType), [materialType, getPriceForMaterial]);
   const { data: suppliers, isLoading: isLoadingSuppliers } = useQuery({
     queryKey: ['suppliers'],
@@ -83,7 +88,7 @@ export function QuickWeightPOS() {
     enabled: !!user,
   });
   const handleAIClassify = async () => {
-    if (effectiveWeight <= 0) {
+    if (typeof effectiveWeight !== 'number' || effectiveWeight <= 0) {
       toast.error("Need weight before AI analysis");
       return;
     }
@@ -95,7 +100,7 @@ export function QuickWeightPOS() {
     }
   };
   const handleCapture = () => {
-    if (effectiveWeight <= 0 || !supplierId || !materialType) {
+    if (typeof effectiveWeight !== 'number' || effectiveWeight <= 0 || !supplierId || !materialType) {
       toast.error("Incomplete Capture Data");
       return;
     }
@@ -104,8 +109,8 @@ export function QuickWeightPOS() {
       supplier_id: supplierId,
       material_type: materialType,
       weight_kg: effectiveWeight,
-      operator_id: user?.id || 'unknown-op',
-      device_id: status === 'disconnected' ? 'manual-keypad' : 'main-scale',
+      operator_id: (user?.id ?? 'unknown-op') as string,
+      device_id: (typeof status === 'string' && status === 'disconnected') ? 'manual-keypad' : 'main-scale',
     });
     addTransaction({
       ledger_entry_id: ledgerEntryId,
@@ -125,7 +130,7 @@ export function QuickWeightPOS() {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent pointer-events-none" />
             <WeightDisplay weight={effectiveWeight} status={status} />
             <div className="grid grid-cols-2 gap-4 w-full max-w-lg mt-4">
-              <Button size="lg" variant="secondary" className="h-16 rounded-2xl font-bold touch-haptic" onClick={connect} disabled={status === 'connected'}>
+              <Button size="lg" variant="secondary" className="h-16 rounded-2xl font-bold touch-haptic" onClick={connect} disabled={typeof status === 'string' && status === 'connected'}>
                 <Cable className="mr-2 h-6 w-6" /> Link Scale
               </Button>
               <Button size="lg" variant="outline" className="h-16 rounded-2xl font-bold touch-haptic" onClick={connectPrinter}>
@@ -206,7 +211,7 @@ export function QuickWeightPOS() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-8">
-                  <RiskMeter score={effectiveWeight > 500 ? 45 : 12} factors={effectiveWeight > 500 ? ['High Volume Transaction'] : ['Stable Stream']} />
+                  <RiskMeter score={(typeof effectiveWeight === 'number' && effectiveWeight > 500) ? 45 : 12} factors={(typeof effectiveWeight === 'number' && effectiveWeight > 500) ? ['High Volume Transaction'] : ['Stable Stream']} />
                   <div className="p-4 rounded-2xl bg-surface-variant/50 border border-white/5 space-y-4">
                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                       <span>Sync Status</span>
@@ -222,7 +227,7 @@ export function QuickWeightPOS() {
             </div>
           </div>
           <motion.div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-6 md:bottom-12" initial={{ y: 100 }} animate={{ y: 0 }}>
-            <Button size="lg" onClick={handleCapture} disabled={effectiveWeight <= 0 || !supplierId || !materialType} className="w-full h-20 rounded-3xl shadow-elevation-12 bg-primary text-primary-foreground font-black text-xl uppercase tracking-widest flex gap-3 active:scale-95 transition-all">
+            <Button size="lg" onClick={handleCapture} disabled={typeof effectiveWeight !== 'number' || effectiveWeight <= 0 || !supplierId || !materialType} className="w-full h-20 rounded-3xl shadow-elevation-12 bg-primary text-primary-foreground font-black text-xl uppercase tracking-widest flex gap-3 active:scale-95 transition-all">
               <Sparkles className="h-8 w-8" /> Capture Verification
             </Button>
           </motion.div>
