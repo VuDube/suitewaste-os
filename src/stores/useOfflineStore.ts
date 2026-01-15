@@ -8,6 +8,7 @@ interface OfflineState {
   pendingLedgerEntries: InventoryLedgerEntry[];
   pendingTransactions: Transaction[];
   isOnline: boolean;
+  isSyncing: boolean;
   addLedgerEntry: (entry: Omit<InventoryLedgerEntry, 'id' | 'is_synced' | 'created_at' | 'capture_timestamp'> & { id?: string }) => string;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'is_synced' | 'created_at' | 'transaction_timestamp'>) => void;
   syncAllPending: () => Promise<void>;
@@ -24,6 +25,7 @@ export const useOfflineStore = create<OfflineState>()(
       pendingLedgerEntries: [],
       pendingTransactions: [],
       isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      isSyncing: false,
       addLedgerEntry: (entry) => {
         const id = entry.id || crypto.randomUUID();
         const newEntry: InventoryLedgerEntry = {
@@ -34,9 +36,7 @@ export const useOfflineStore = create<OfflineState>()(
           capture_timestamp: Date.now(),
         };
         set((state) => ({ pendingLedgerEntries: [...state.pendingLedgerEntries, newEntry] }));
-        toast.success('Weight captured locally', {
-          description: `${newEntry.weight_kg.toFixed(2)}kg of ${newEntry.material_type} is queued for sync.`,
-        });
+        toast.success('Weight captured locally');
         return id;
       },
       addTransaction: (transaction) => {
@@ -48,59 +48,58 @@ export const useOfflineStore = create<OfflineState>()(
           transaction_timestamp: Date.now(),
         };
         set((state) => ({ pendingTransactions: [...state.pendingTransactions, newTransaction] }));
-        toast.success('Transaction saved locally', { description: 'Queued for sync.' });
+        toast.success('Transaction queued');
       },
       syncAllPending: async () => {
-        const isOnline = get().isOnline;
-        const pendingLedgerEntries = get().pendingLedgerEntries;
-        const pendingTransactions = get().pendingTransactions;
-        if (!isOnline || (pendingLedgerEntries.length === 0 && pendingTransactions.length === 0)) return;
-        let ledgerSynced = false;
-        let transactionSynced = false;
-        if (pendingLedgerEntries.length > 0) {
-          try {
+        const { isOnline, isSyncing, pendingLedgerEntries, pendingTransactions } = get();
+        if (!isOnline || isSyncing || (pendingLedgerEntries.length === 0 && pendingTransactions.length === 0)) {
+          return;
+        }
+        set({ isSyncing: true });
+        try {
+          let ledgerSuccess = false;
+          let transactionSuccess = false;
+          // 1. Sync Ledger Entries First
+          if (pendingLedgerEntries.length > 0) {
             const res = await api<{ syncedIds: string[] }>('/api/sync/ledger', {
-              method: 'POST', body: JSON.stringify({ pendingEntries: pendingLedgerEntries }),
+              method: 'POST', 
+              body: JSON.stringify({ pendingEntries: pendingLedgerEntries }),
             });
             if (res.syncedIds.length > 0) {
               set(state => ({
                 pendingLedgerEntries: state.pendingLedgerEntries.filter(e => !res.syncedIds.includes(e.id)),
               }));
-              ledgerSynced = true;
+              ledgerSuccess = true;
             }
-          } catch (error) {
-            console.error('Ledger sync failed:', error);
           }
-        }
-        if (pendingTransactions.length > 0) {
-          try {
+          // 2. Sync Transactions
+          if (pendingTransactions.length > 0) {
             const res = await api<{ syncedIds: string[] }>('/api/sync/transactions', {
-              method: 'POST', body: JSON.stringify({ pendingTransactions: pendingTransactions }),
+              method: 'POST', 
+              body: JSON.stringify({ pendingTransactions: pendingTransactions }),
             });
             if (res.syncedIds.length > 0) {
               set(state => ({
                 pendingTransactions: state.pendingTransactions.filter(t => !res.syncedIds.includes(t.id)),
               }));
-              transactionSynced = true;
-            }
-          } catch (error) {
-            console.error('Transaction sync failed:', error);
-          }
-        }
-        if (ledgerSynced || transactionSynced) {
-          toast.success('Pending items synced successfully!');
-          if (typeof window !== 'undefined') {
-            const queryClient = (window as any).queryClient;
-            if (queryClient) {
-              queryClient.invalidateQueries({ queryKey: ['ledger'] });
-              queryClient.invalidateQueries({ queryKey: ['transactions'] });
-              queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-              queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-              queryClient.invalidateQueries({ queryKey: ['hr'] });
-              queryClient.invalidateQueries({ queryKey: ['fleet'] });
-              queryClient.invalidateQueries({ queryKey: ['compliance'] });
+              transactionSuccess = true;
             }
           }
+          if (ledgerSuccess || transactionSuccess) {
+            toast.success('Cloud synchronization complete');
+            // Re-fetch application data
+            if (typeof window !== 'undefined') {
+              const qc = (window as any).queryClient;
+              if (qc) {
+                qc.invalidateQueries();
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Sync failure:', error);
+          toast.error('Sync interrupted', { description: 'Local data remains safe. Retrying when stable.' });
+        } finally {
+          set({ isSyncing: false });
         }
       },
       setOnlineStatus: (isOnline) => set({ isOnline }),
@@ -111,15 +110,13 @@ export const useOfflineStore = create<OfflineState>()(
     }
   )
 );
+// Global connectivity listeners
 if (typeof window !== 'undefined') {
-  const handleOnline = () => useOfflineStore.getState().setOnlineStatus(true);
-  const handleOffline = () => useOfflineStore.getState().setOnlineStatus(false);
-  window.addEventListener('online', handleOnline);
-  window.addEventListener('offline', handleOffline);
+  window.addEventListener('online', () => useOfflineStore.getState().setOnlineStatus(true));
+  window.addEventListener('offline', () => useOfflineStore.getState().setOnlineStatus(false));
+  // Auto-sync trigger
   useOfflineStore.subscribe((state, prevState) => {
-    const totalPending = state.pendingLedgerEntries.length + state.pendingTransactions.length;
-    if (state.isOnline && !prevState.isOnline && totalPending > 0) {
-      toast.info("Back online! Attempting sync...");
+    if (state.isOnline && !prevState.isOnline) {
       state.syncAllPending();
     }
   });
