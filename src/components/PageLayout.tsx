@@ -1,10 +1,15 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { GlobalNav } from '@/components/GlobalNav';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, Menu } from 'lucide-react';
+import { Loader2, Menu, LogOut } from 'lucide-react';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { ThemeToggle } from './ThemeToggle';
 import { cn } from '@/lib/utils';
 type PageLayoutProps = {
   children: React.ReactNode;
@@ -12,6 +17,16 @@ type PageLayoutProps = {
 };
 export function PageLayout({ children, fullBleed = false }: PageLayoutProps) {
   const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const logoutAction = useAuthStore(s => s.logout);
+  const queryClient = useQueryClient();
+
+  const handleLogout = () => {
+    logoutAction();
+    queryClient.clear();
+    toast.success('Industrial session terminated.');
+    navigate('/login', { replace: true });
+  };
   if (isLoading) {
     return (
       <div className="h-dvh w-full flex items-center justify-center bg-background">
@@ -30,11 +45,25 @@ export function PageLayout({ children, fullBleed = false }: PageLayoutProps) {
           {/* Header Safe Area Spacer */}
           <div className="h-[env(safe-area-inset-top)] bg-background/95 shrink-0 z-50 md:hidden" />
           {/* Mobile Top Header (Minimal) */}
-          <header className="md:hidden h-14 flex items-center px-4 border-b border-white/5 bg-background/80 backdrop-blur-xl shrink-0 z-40">
+          <header className="md:hidden h-14 flex items-center justify-between px-4 border-b border-white/5 bg-background/80 backdrop-blur-xl shrink-0 z-40">
             <SidebarTrigger className="h-10 w-10 rounded-xl hover:bg-surface-variant/50">
               <Menu className="h-5 w-5" />
             </SidebarTrigger>
-            <span className="ml-4 text-xs font-black uppercase tracking-widest">SuiteWaste OS</span>
+            <div className="flex-1 flex justify-center">
+              <span className="text-xs font-black uppercase tracking-widest text-center">SuiteWaste OS</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ThemeToggle className="h-10 w-10 hover:scale-105 transition-transform z-50" />
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={handleLogout} 
+                className="h-10 px-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-2xl border-2 border-destructive hover:border-destructive/80 bg-destructive/95 hover:bg-destructive active:scale-95 transition-all ml-auto"
+              >
+                <LogOut className="h-4 w-4 mr-1" />
+                LOGOUT
+              </Button>
+            </div>
           </header>
           {/* Main Scrollable Content */}
           <main className="flex-1 overflow-y-auto scrollbar-hide relative z-0">
@@ -52,6 +81,8 @@ export function PageLayout({ children, fullBleed = false }: PageLayoutProps) {
           <div className="h-[env(safe-area-inset-bottom)] bg-background/95 shrink-0 z-40 md:hidden" />
         </SidebarInset>
       </div>
+      {/* Fixed Desktop ThemeToggle */}
+      <ThemeToggle className="fixed top-5 right-5 z-[99] hidden md:flex h-12 w-12 shadow-xl pointer-events-auto" />
     </SidebarProvider>
   );
 }

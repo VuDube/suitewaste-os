@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Weight, Menu, LogOut, Zap, Box, Truck, ShieldCheck, BookOpen, Landmark, Briefcase, ShoppingCart, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
@@ -38,6 +38,7 @@ export function GlobalNav() {
   const logout = useAuthStore(s => s.logout);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const location = useLocation();
   const handleLogout = () => {
     logout();
     queryClient.clear();
@@ -59,7 +60,7 @@ export function GlobalNav() {
       >
         <LayoutDashboard className="w-5 h-5 mb-1" />
         <span className="text-[8px] font-black uppercase tracking-widest">Home</span>
-        <NavLink to="/" className={({ isActive }) => cn("absolute -bottom-1 h-1 w-1 rounded-full bg-primary transition-opacity", isActive ? "opacity-100" : "opacity-0")} />
+        <span className={cn("absolute -bottom-1 left-1/2 transform -translate-x-1/2 h-1.5 w-1.5 rounded-full bg-primary shadow-lg transition-all duration-300", location.pathname === '/' ? 'opacity-100 scale-125' : 'opacity-0 scale-0')} />
       </NavLink>
       <NavLink 
         to="/quick-weight" 
@@ -71,7 +72,7 @@ export function GlobalNav() {
       >
         <Weight className="w-5 h-5 mb-1" />
         <span className="text-[8px] font-black uppercase tracking-widest">POS</span>
-        <NavLink to="/quick-weight" className={({ isActive }) => cn("absolute -bottom-1 h-1 w-1 rounded-full bg-primary transition-opacity", isActive ? "opacity-100" : "opacity-0")} />
+        <span className={cn("absolute -bottom-1 left-1/2 transform -translate-x-1/2 h-1.5 w-1.5 rounded-full bg-primary shadow-lg transition-all duration-300", location.pathname === '/quick-weight' ? 'opacity-100 scale-125' : 'opacity-0 scale-0')} />
       </NavLink>
       <Sheet>
         <SheetTrigger asChild>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { 
   HardHat, Weight, Box, Truck, ShieldCheck, 
   BookOpen, Landmark, Briefcase, ShoppingCart, 
@@ -21,6 +21,10 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useOfflineStore } from "@/stores/useOfflineStore";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 const groups = [
   {
     name: "Operations",
@@ -61,6 +65,16 @@ export function AppSidebar(): JSX.Element {
       return matchesSearch && hasRole;
     })
   })).filter(group => group.items.length > 0);
+
+  const navigate = useNavigate();
+  const logoutAction = useAuthStore(s => s.logout);
+  const queryClient = useQueryClient();
+  const handleLogout = () => {
+    logoutAction();
+    queryClient.clear();
+    toast.success('Session terminated.');
+    navigate('/login', { replace: true });
+  };
   return (
     <Sidebar className="hidden md:flex border-r border-white/5 bg-background/50 backdrop-blur-xl">
       <SidebarHeader className="p-4">
@@ -93,16 +107,16 @@ export function AppSidebar(): JSX.Element {
               {group.items.map(item => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild className="p-0">
-                    <NavLink 
+                    <NavLink
                       to={item.href}
                       className={({ isActive }) => cn(
                         "flex items-center gap-3 w-full px-3 py-3 rounded-xl transition-all duration-200 group",
-                        isActive 
-                          ? "bg-primary text-primary-foreground shadow-elevation-4" 
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-elevation-4"
                           : "text-muted-foreground hover:bg-surface-variant/50 hover:text-foreground"
                       )}
                     >
-                      <item.icon className="h-4 w-4 shrink-0" />
+                      {React.createElement(item.icon, { className: "h-4 w-4 shrink-0" })}
                       <span className="text-xs font-bold tracking-tight">{item.label}</span>
                     </NavLink>
                   </SidebarMenuButton>
@@ -129,6 +143,16 @@ export function AppSidebar(): JSX.Element {
             <Zap className="h-3 w-3 text-primary" />
             <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Edge JHB-1 Online</span>
           </div>
+        </div>
+        <div className="pt-4 border-t border-white/10 mt-4">
+          <Button 
+            onClick={handleLogout} 
+            variant="destructive" 
+            className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-sm shadow-2xl hover:shadow-glow border-2 border-destructive/50 bg-destructive hover:bg-destructive/90 active:scale-95 transition-all justify-start px-4 gap-3"
+          >
+            <LogOut className="h-5 w-5 shrink-0" />
+            End Secure Session
+          </Button>
         </div>
       </SidebarFooter>
     </Sidebar>
