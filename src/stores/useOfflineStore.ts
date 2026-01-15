@@ -51,7 +51,9 @@ export const useOfflineStore = create<OfflineState>()(
         toast.success('Transaction saved locally', { description: 'Queued for sync.' });
       },
       syncAllPending: async () => {
-        const { isOnline, pendingLedgerEntries, pendingTransactions } = get();
+        const isOnline = get().isOnline;
+        const pendingLedgerEntries = get().pendingLedgerEntries;
+        const pendingTransactions = get().pendingTransactions;
         if (!isOnline || (pendingLedgerEntries.length === 0 && pendingTransactions.length === 0)) return;
         let ledgerSynced = false;
         let transactionSynced = false;
@@ -67,7 +69,7 @@ export const useOfflineStore = create<OfflineState>()(
               ledgerSynced = true;
             }
           } catch (error) {
-            toast.error('Ledger sync failed');
+            console.error('Ledger sync failed:', error);
           }
         }
         if (pendingTransactions.length > 0) {
@@ -82,7 +84,7 @@ export const useOfflineStore = create<OfflineState>()(
               transactionSynced = true;
             }
           } catch (error) {
-            toast.error('Transaction sync failed');
+            console.error('Transaction sync failed:', error);
           }
         }
         if (ledgerSynced || transactionSynced) {
@@ -94,6 +96,9 @@ export const useOfflineStore = create<OfflineState>()(
               queryClient.invalidateQueries({ queryKey: ['transactions'] });
               queryClient.invalidateQueries({ queryKey: ['suppliers'] });
               queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+              queryClient.invalidateQueries({ queryKey: ['hr'] });
+              queryClient.invalidateQueries({ queryKey: ['fleet'] });
+              queryClient.invalidateQueries({ queryKey: ['compliance'] });
             }
           }
         }
